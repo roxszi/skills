@@ -42,7 +42,7 @@ npx skills add roxszi/skills --list
 
 ---
 
-## 📚 `local-kb` — 本地信息资源数据库 (v1.2.0)
+## 📚 `local-kb` — 本地信息资源数据库
 
 本地知识库的统一执行入口。给文献、健康档案、项目档案、联系人档案、会议纪要等"长期累积 + 检索 + 反查 + 备份"场景用。
 
@@ -74,7 +74,7 @@ npx skills add roxszi/skills --list
 
 ---
 
-## 🔍 `ocr-toolkit` — OCR 工具箱 (v1.0.1)
+## 🔍 `ocr-toolkit` — OCR 工具箱
 
 中文 OCR + PDF 扫描件 + 科研文献 / 体检报告 / 病历 / 发票等场景。基于 Python `rapidocr-onnxruntime` + `pymupdf` + `pdfplumber`。
 
@@ -110,7 +110,7 @@ PDF → pymupdf 判定有无文本层
 
 ---
 
-## 📝 `tech-brief-writer` — 技术简报撰写 (v3.2.4)
+## 📝 `tech-brief-writer` — 技术简报撰写
 
 为某项技术（尤指物理 / 化学 / 光谱 / 仪器 / 计量学交叉域）撰写"可存档技术简报"。产出 **MD 简报 + 可选交互式 HTML 演示**双件套。
 
@@ -203,14 +203,4 @@ skills/
 
 ## License
 
-[木兰宽松许可证，第 2 版](LICENSE) © RoxSzi（SI_Cheng-Yun, 司承运）
-
----
-
-<!-- TODO(发布前): 替换完后，把本行以下整段 placeholder 提示删掉 -->
-
-> ⚠️ **发布前 checklist**：
-> 1. 把 README 顶部 `roxszi` 全部替换成你的 GitHub 用户名（与 AtomGit 同步后保持一致）
-> 2. 检查 `skills/ocr-toolkit/test/output/体检报告_视觉筛查_pages/page_01_200dpi.png` 是否含需要打码的敏感信息
-> 3. 处理 `skills/ocr-toolkit/SKILL.md` 第 134 行和附录 A 的本地绝对路径（详见仓库诊断）
-> 4. `git add . && git commit -m "init: 3 skills (local-kb / ocr-toolkit / tech-brief-writer)" && git push` 推到 AtomGit（自动镜像 GitHub）
+[木兰宽松许可证，第 2 版](LICENSE) © RoxSzi (SI_Cheng-Yun, 司承运)
