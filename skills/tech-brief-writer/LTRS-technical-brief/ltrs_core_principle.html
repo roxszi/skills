@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LTRS 核心原理：双作用合一 & 三股力 trade-off</title>
+<style>
+  /* ===== 全局样式 ===== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+    background: #f5f5f5;
+    color: #333;
+    padding: 16px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 1.3em;
+    margin-bottom: 4px;
+    color: #1565C0;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 0.82em;
+    color: #666;
+    margin-bottom: 14px;
+  }
+  .anchor {
+    text-align: center;
+    font-size: 0.95em;
+    color: #C62828;
+    font-weight: 600;
+    margin-bottom: 14px;
+    padding: 8px 14px;
+    background: #FFEBEE;
+    border-radius: 6px;
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .anchor small { color: #555; font-weight: 400; }
+
+  /* ===== 控制面板 ===== */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    justify-content: center;
+    align-items: flex-end;
+    background: #fff;
+    padding: 14px 18px;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    margin-bottom: 14px;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .ctrl-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 130px;
+  }
+  .ctrl-group label {
+    font-size: 0.75em;
+    color: #555;
+    font-weight: 600;
+  }
+  .ctrl-group label .val {
+    color: #1565C0;
+    font-family: 'Consolas', monospace;
+  }
+  input[type="range"] {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    background: #e0e0e0;
+    border-radius: 3px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #1565C0;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #1565C0;
+    cursor: pointer;
+    border: 2px solid #fff;
+  }
+
+  /* ===== 面板网格 ===== */
+  .panel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    max-width: 1200px;
+    margin: 0 auto 16px;
+  }
+  .panel {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    overflow: hidden;
+  }
+  .panel-title {
+    font-size: 0.82em;
+    font-weight: 700;
+    padding: 8px 12px 4px;
+    line-height: 1.3;
+  }
+  .panel.a .panel-title { color: #1565C0; }
+  .panel.b .panel-title { color: #2E7D32; }
+  .panel.c .panel-title { color: #C62828; }
+  .panel.d .panel-title { color: #6A1B9A; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 260px;
+  }
+  .legend-bar {
+    font-size: 0.72em;
+    color: #555;
+    padding: 4px 12px 10px;
+    line-height: 1.4;
+  }
+  .footer-note {
+    text-align: center;
+    font-size: 0.78em;
+    color: #888;
+    max-width: 800px;
+    margin: 12px auto 0;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<h1>LTRS 核心原理交互演示</h1>
+<p class="subtitle">单光束内双作用合一，功率预算下三股力 trade-off</p>
+
+<div class="anchor">
+  ★ <b>单一核心洞察</b>：同一束激光同一焦点，捕获（梯度力）与采谱（拉曼散射）共争功率——<br>
+  <small>"一束光，两件事；三股力（trap power / signal power / damage），互打架。"</small>
+</div>
+
+<!-- ===== 参数控制 ===== -->
+<div class="controls">
+  <div class="ctrl-group">
+    <label>功率 P (mW): <span class="val" id="power-val">10</span></label>
+    <input type="range" id="power" min="1" max="50" step="1" value="10">
+  </div>
+  <div class="ctrl-group">
+    <label>物镜 NA: <span class="val" id="na-val">1.20</span></label>
+    <input type="range" id="na" min="0.7" max="1.45" step="0.05" value="1.2">
+  </div>
+  <div class="ctrl-group">
+    <label>粒子半径 a (μm): <span class="val" id="a-val">2.5</span></label>
+    <input type="range" id="a" min="0.5" max="10" step="0.1" value="2.5">
+  </div>
+  <div class="ctrl-group">
+    <label>波长 λ (nm): <span class="val" id="lambda-val">785</span></label>
+    <input type="range" id="lambda" min="400" max="1300" step="5" value="785">
+  </div>
+  <div class="ctrl-group">
+    <label>几何形貌: <span class="val" id="geom-val">Point</span></label>
+    <input type="range" id="geom" min="0" max="2" step="1" value="0">
+  </div>
+</div>
+
+<!-- ===== 四个面板 ===== -->
+<div class="panel-grid">
+
+  <!-- A: 受力 · 梯度力 vs 散射力 -->
+  <div class="panel a">
+    <div class="panel-title">(A) 受力分析：F<sub>grad</sub> vs F<sub>scat</sub>（瑞利区标度）</div>
+    <canvas id="canvas-a"></canvas>
+    <div class="legend-bar">
+      蓝箭头 = 梯度力（指向焦点，回复）　·　红箭头 = 散射力（沿光轴，推离）
+      <br>判据：F<sub>grad</sub><sup>(z)</sup> &gt; F<sub>scat</sub><sup>(z)</sup> 可稳定单光束捕获
+    </div>
+  </div>
+
+  <!-- B: 简谐势阱 + 位置分布 -->
+  <div class="panel b">
+    <div class="panel-title">(B) 简谐势阱 + 热扰动位置分布 ⟨x²⟩ = k<sub>B</sub>T/κ</div>
+    <canvas id="canvas-b"></canvas>
+    <div class="legend-bar">
+      左轴：势能 U(x) = ½κx²　·　右轴（绿色阴影）：粒子位置的概率分布
+      <br>提示：高功率 / 高 NA → 阱刚 κ 大 → 位置涨落小
+    </div>
+  </div>
+
+  <!-- C: 三种光场焦面形态 -->
+  <div class="panel c">
+    <div class="panel-title">(C) 三种结构光场：Point / Donut / Line 焦面形态</div>
+    <canvas id="canvas-c"></canvas>
+    <div class="legend-bar">
+      拖动"几何形貌"滑块切换　·　蓝色虚线圆 = RBC 轮廓　·　拖"波长"看 Rayleigh 散射标度
+    </div>
+  </div>
+
+  <!-- D: ν⁴ 律 + trade-off -->
+  <div class="panel d">
+    <div class="panel-title">(D) λ ↔ 拉曼信号 (ν<sup>4</sup> 律) vs 光损伤阈值</div>
+    <canvas id="canvas-d"></canvas>
+    <div class="legend-bar">
+      紫曲线 = 相对拉曼信号 ∝ ν<sup>4</sup>　·　橙曲线 = 相对光损伤指数（波长缩短而上升）
+      <br>★ 最佳工作窗：信号够大 且 损伤低于红线
+    </div>
+  </div>
+
+</div>
+
+<div class="footer-note">
+  ⚠️ 本演示力的具体数值为定性标度（瑞利区公式 `a ≪ λ`），活细胞（μm 级）严格属 Mie 区，仅供机理理解。详见 <code>LTRS_技术简报.md</code> §4 / §9 警示。
+</div>
+
+<script>
+'use strict';
+
+// ============================================================
+// 1. 物理参数与状态（参数改变时同步）
+// ============================================================
+const STATE = {
+  power_mW: 10,           // 激光功率（毫瓦），1–50
+  NA: 1.20,              // 物镜数值孔径，0.7–1.45
+  a_um: 2.5,             // 粒子半径（微米），0.5–10
+  lambda_nm: 785,        // 波长（纳米），400–1300
+  geom: 0,               // 0=Point, 1=Donut, 2=Line
+};
+
+// 高 DPI 显示；保留备用参数
+const PHYS = {
+  k_B: 1.38e-23,        // 玻尔兹曼常数
+  T: 300,               // 室温（K）
+};
+
+// ============================================================
+// 2. 物理函数
+// ============================================================
+
+/** 相对折射率（介电 vs 介质）：固定聚苯小球 / 水介质 ~1.19 */
+function mRelative() { return 1.19; }
+
+/** Clausius-Mossotti 因子（无量纲，参与标度） */
+function cmFactor(m) {
+  return (m * m - 1) / (m * m + 2);
+}
+
+/**
+ * 计算力标度（瑞利区）：
+ *  - F_grad ∝ a^3 · ∇I ；∇I ∝ NA^4 · P （高 NA 物镜下经验标度，简化处理）
+ *  - F_scat ∝ a^6 · I / λ^4  ；I ∝ P / (NA^2 · 工作体积)
+ * 返回 {Fgrad标度, Fscat标度, ratio}
+ */
+function computeForces() {
+  const m = mRelative();
+  const cm = cmFactor(m);
+  const a = STATE.a_um;       // μm
+  const NA = STATE.NA;
+  const P = STATE.power_mW;   // mW
+  const lam = STATE.lambda_nm; // nm
+
+  // 标度公式（去常数、保留相对量级）
+  const Fgrad = cm * Math.pow(a, 3) * Math.pow(NA, 4) * P;
+  const Fscat = cm * cm * Math.pow(a, 6) * P / (Math.pow(lam, 4) * Math.pow(NA, 2));
+  const ratio = Fgrad / Fscat;
+  return { Fgrad, Fscat, ratio, cm };
+}
+
+/**
+ * 简谐势阱刚度 κ（标度版本）：
+ *   κ ∝ (F_grad / a) 即粒子偏离焦点时回复力的斜率
+ *   严格：κ = k_B T / ⟨x²⟩ ；这里用能量均分反推一个特征位移
+ */
+function trapStiffness(Fgrad) {
+  // 标度：κ = F_grad / (~10 nm)。经验数量级 pN/nm
+  return Fgrad / 0.01;  // 单位近似 pN/nm
+}
+
+/** 能量均分法：⟨x²⟩ = k_B T / κ */
+function thermalFluctuation(kappa) {
+  // κ 用 N/m 表示；这里把 kappa 换算到 N/m
+  const kappa_Nm = kappa * 1e-6;  // pN/nm → N/m
+  return Math.sqrt(PHYS.k_B * PHYS.T / kappa_Nm) * 1e9;  // 返回 nm
+}
+
+/**
+ * 拉曼散射强度相对值：ν⁴ 律
+ *   I_Raman ∝ (1/λ)^4 · I_laser ；I_laser ∝ P / A_spot，A_spot ∝ 1/NA^2
+ */
+function ramanRelative() {
+  const nu4 = Math.pow(1e7 / STATE.lambda_nm, 4);  // 频率四次方（用 ν̃ = 1/λ）
+  const NA = STATE.NA;
+  // 激光功率密度 ∝ P · NA^2
+  const intensity = STATE.power_mW * NA * NA;
+  return nu4 * intensity;
+}
+
+/** 光损伤相对指数（经验标度：波长越短损伤越剧；功率越高损伤越剧） */
+function damageRelative() {
+  const lam = STATE.lambda_nm;
+  // 短波长（400 nm）→ 损伤高；长波长（1300 nm）→ 损伤低
+  // 用一个反比 + 功率放大
+  const baseDamage = Math.pow(1100 / lam, 2);  // 1100 nm 为参考
+  return baseDamage * STATE.power_mW;
+}
+
+// ============================================================
+// 3. Canvas 工具
+// ============================================================
+
+/** 高 DPI Canvas 初始化 */
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return { ctx, w: rect.width, h: rect.height };
+}
+
+/** 坐标轴绘制 */
+function drawAxes(ctx, xMin, xMax, yMin, yMax, w, h, xLabel, yLabel, opts = {}) {
+  const margin = opts.margin || { l: 48, r: 14, t: 12, b: 30 };
+  const px = (x) => margin.l + (x - xMin) / (xMax - xMin) * (w - margin.l - margin.r);
+  const py = (y) => h - margin.b - (y - yMin) / (yMax - yMin) * (h - margin.t - margin.b);
+
+  ctx.save();
+  ctx.font = '10px Consolas, monospace';
+  ctx.fillStyle = '#888';
+
+  // 网格 + X 刻度
+  const xTicks = opts.xTicks || 5;
+  for (let i = 0; i <= xTicks; i++) {
+    const xVal = xMin + (xMax - xMin) * i / xTicks;
+    const X = px(xVal);
+    ctx.strokeStyle = '#eee';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(X, margin.t); ctx.lineTo(X, h - margin.b); ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.fillText(xVal.toFixed(opts.xDecimals ?? 1), X, h - margin.b + 12);
+  }
+  // 网格 + Y 刻度
+  const yTicks = opts.yTicks || 4;
+  for (let i = 0; i <= yTicks; i++) {
+    const yVal = yMin + (yMax - yMin) * i / yTicks;
+    const Y = py(yVal);
+    ctx.strokeStyle = '#eee';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(margin.l, Y); ctx.lineTo(w - margin.r, Y); ctx.stroke();
+    ctx.textAlign = 'right';
+    ctx.fillText(yVal.toFixed(opts.yDecimals ?? 0), margin.l - 4, Y + 3);
+  }
+  // 轴线
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(margin.l, margin.t); ctx.lineTo(margin.l, h - margin.b);
+  ctx.lineTo(w - margin.r, h - margin.b);
+  ctx.stroke();
+  // 零线
+  if (yMin < 0 && yMax > 0) {
+    const Y0 = py(0);
+    ctx.strokeStyle = '#ccc';
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(margin.l, Y0); ctx.lineTo(w - margin.r, Y0); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  // 轴标签
+  ctx.fillStyle = '#555';
+  ctx.font = '11px Segoe UI, Microsoft YaHei, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(xLabel, (margin.l + w - margin.r) / 2, h - 4);
+  ctx.save();
+  ctx.translate(11, (margin.t + h - margin.b) / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText(yLabel, 0, 0);
+  ctx.restore();
+  ctx.restore();
+}
+
+/** 折线绘制 */
+function drawLine(ctx, data, xMin, xMax, yMin, yMax, w, h, opts) {
+  const margin = opts.margin || { l: 48, r: 14, t: 12, b: 30 };
+  const px = (x) => margin.l + (x - xMin) / (xMax - xMin) * (w - margin.l - margin.r);
+  const py = (y) => h - margin.b - (y - yMin) / (yMax - yMin) * (h - margin.t - margin.b);
+  ctx.save();
+  ctx.strokeStyle = opts.color;
+  ctx.lineWidth = opts.lineWidth ?? 1.4;
+  ctx.beginPath();
+  let started = false;
+  for (const p of data) {
+    const X = px(p.x), Y = py(p.y);
+    if (!started) { ctx.moveTo(X, Y); started = true; }
+    else ctx.lineTo(X, Y);
+  }
+  ctx.stroke();
+  // 填充
+  if (opts.fill) {
+    ctx.lineTo(px(data[data.length - 1].x), py(opts.fillTo ?? 0));
+    ctx.lineTo(px(data[0].x), py(opts.fillTo ?? 0));
+    ctx.closePath();
+    ctx.fillStyle = opts.fillColor || opts.color;
+    ctx.globalAlpha = 0.18;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+// ============================================================
+// 4. 四面板绘制
+// ============================================================
+
+/** (A) 受力分析：F_grad vs F_scat */
+function drawPanelA() {
+  const canvas = document.getElementById('canvas-a');
+  const { ctx, w, h } = setupCanvas(canvas);
+  const F = computeForces();
+
+  // Y 用各自量归一化到 [0, 1]
+  const yMax = Math.max(F.Fgrad, F.Fscat) * 1.15;
+  drawAxes(ctx, 0, 50, 0, yMax, w, h,
+    '激光功率 P (mW)', '力 (标度，a.u.)', { xTicks: 5, yTicks: 4 });
+
+  // F_grad 曲线（蓝色实线）— 近似线性于 P
+  const gradData = [];
+  for (let P = 1; P <= 50; P += 1) {
+    gradData.push({ x: P, y: STATE.NA === 0 ? 0 : (F.cm * Math.pow(STATE.a_um, 3) * Math.pow(STATE.NA, 4) * P) });
+  }
+  drawLine(ctx, gradData, 0, 50, 0, yMax, w, h,
+    { color: '#1565C0', lineWidth: 1.6, fill: true, fillTo: 0, fillColor: '#1565C0' });
+
+  // F_scat 曲线（红色虚线）— 也近似线性于 P，但斜率小
+  const scatData = [];
+  for (let P = 1; P <= 50; P += 1) {
+    const y = F.cm * F.cm * Math.pow(STATE.a_um, 6) * P / (Math.pow(STATE.lambda_nm, 4) * Math.pow(STATE.NA, 2));
+    scatData.push({ x: P, y });
+  }
+  ctx.save();
+  ctx.setLineDash([5, 4]);
+  drawLine(ctx, scatData, 0, 50, 0, yMax, w, h,
+    { color: '#C62828', lineWidth: 1.4 });
+  ctx.restore();
+
+  // 当前 P 处的两根箭头
+  const margin = { l: 48, r: 14, t: 12, b: 30 };
+  const px = (x) => margin.l + (x - 0) / (50 - 0) * (w - margin.l - margin.r);
+  const py = (y) => h - margin.b - (y - 0) / (yMax - 0) * (h - margin.t - margin.b);
+  const xNow = px(STATE.power_mW);
+
+  const fGradNow = F.Fgrad;
+  const fScatNow = F.Fscat;
+  ctx.save();
+  // 蓝色箭头（F_grad）
+  ctx.strokeStyle = '#1565C0';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(xNow, py(0)); ctx.lineTo(xNow, py(fGradNow)); ctx.stroke();
+  ctx.fillStyle = '#1565C0';
+  ctx.beginPath();
+  ctx.moveTo(xNow - 5, py(fGradNow) + 8);
+  ctx.lineTo(xNow + 5, py(fGradNow) + 8);
+  ctx.lineTo(xNow, py(fGradNow) - 2);
+  ctx.closePath(); ctx.fill();
+
+  // 红色箭头（F_scat）
+  ctx.strokeStyle = '#C62828';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(xNow, py(0)); ctx.lineTo(xNow, py(fScatNow)); ctx.stroke();
+  ctx.fillStyle = '#C62828';
+  ctx.beginPath();
+  ctx.moveTo(xNow - 5, py(fScatNow) + 8);
+  ctx.lineTo(xNow + 5, py(fScatNow) + 8);
+  ctx.lineTo(xNow, py(fScatNow) - 2);
+  ctx.closePath(); ctx.fill();
+
+  // 当前判据文字
+  ctx.font = '11px Segoe UI, sans-serif';
+  ctx.fillStyle = F.ratio > 5 ? '#2E7D32' : '#C62828';
+  ctx.textAlign = 'left';
+  const ratioText = F.ratio > 5 ? '✅ 满足 Ashkin 判据' : '⚠️ 接近失稳';
+  ctx.fillText(`${ratioText}（比值 = ${F.ratio.toFixed(2)}×）`, xNow + 8, py(Math.max(fGradNow, fScatNow)) - 6);
+  ctx.restore();
+
+  // 图例
+  ctx.save();
+  ctx.font = '10px Segoe UI, sans-serif';
+  ctx.fillStyle = '#1565C0';
+  ctx.fillRect(w - 130, 12, 12, 3);
+  ctx.fillStyle = '#555'; ctx.fillText('F_grad（梯度力）', w - 114, 14);
+  ctx.fillStyle = '#C62828';
+  ctx.fillRect(w - 130, 28, 12, 3);
+  ctx.fillStyle = '#555'; ctx.fillText('F_scat（散射力）', w - 114, 30);
+  ctx.restore();
+}
+
+/** (B) 简谐势阱 + 热分布 */
+function drawPanelB() {
+  const canvas = document.getElementById('canvas-b');
+  const { ctx, w, h } = setupCanvas(canvas);
+  const F = computeForces();
+  const kappa = trapStiffness(F.Fgrad);
+  const x_rms = thermalFluctuation(kappa);  // nm
+
+  // 当前阱刚度下的势能分布宽度（~3σ）
+  const xRange = Math.max(x_rms * 3, 50);
+  drawAxes(ctx, -xRange, xRange, -0.5, 4, w, h,
+    '位移 x (nm)', 'U/(kT)', { xTicks: 6, yTicks: 4, xDecimals: 0 });
+
+  // 势能 U(x) = ½ κ x² 标度到 kT 单位
+  const Umax_display = 3;  // 上界
+  const conv = Umax_display / (0.5 * kappa * 1e-6 * Math.pow(xRange * 1e-9, 2) / (PHYS.k_B * PHYS.T));
+  const potData = [];
+  for (let i = 0; i <= 200; i++) {
+    const x = -xRange + 2 * xRange * i / 200;
+    const U = 0.5 * kappa * 1e-6 * Math.pow(x * 1e-9, 2) / (PHYS.k_B * PHYS.T) * conv;
+    potData.push({ x, y: U });
+  }
+  drawLine(ctx, potData, -xRange, xRange, -0.5, 4, w, h,
+    { color: '#2E7D32', lineWidth: 1.8 });
+
+  // 高斯热分布 p(x) ∝ exp(-U/kT) ∝ exp(-x²/(2σ²))；σ = x_rms
+  const distData = [];
+  const ampMax = 3;
+  for (let i = 0; i <= 200; i++) {
+    const x = -xRange + 2 * xRange * i / 200;
+    const env = Math.exp(-x * x / (2 * x_rms * x_rms));
+    distData.push({ x, y: env * ampMax });
+  }
+  drawLine(ctx, distData, -xRange, xRange, -0.5, 4, w, h,
+    { color: '#FF8F00', lineWidth: 1.2, fill: true, fillTo: 0, fillColor: '#FF8F00' });
+
+  // 标注 σ
+  const margin = { l: 48, r: 14, t: 12, b: 30 };
+  const px = (x) => margin.l + (x - (-xRange)) / (2 * xRange) * (w - margin.l - margin.r);
+  const py = (y) => h - margin.b - (y - (-0.5)) / (4 - (-0.5)) * (h - margin.t - margin.b);
+
+  ctx.save();
+  ctx.strokeStyle = '#FF8F00';
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(px(x_rms), py(0)); ctx.lineTo(px(x_rms), py(ampMax * 0.6)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px(-x_rms), py(0)); ctx.lineTo(px(-x_rms), py(ampMax * 0.6)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.font = '10px Segoe UI, sans-serif';
+  ctx.fillStyle = '#555';
+  ctx.textAlign = 'center';
+  ctx.fillText(`σ ≈ ${x_rms.toFixed(1)} nm`, px(0), py(ampMax * 0.92));
+  ctx.fillText(`κ ≈ ${kappa.toFixed(2)} pN/nm`, px(0), py(ampMax * 0.75));
+  ctx.restore();
+}
+
+/** (C) 三种结构光场：Point / Donut / Line */
+function drawPanelC() {
+  const canvas = document.getElementById('canvas-c');
+  const { ctx, w, h } = setupCanvas(canvas);
+
+  const cx = w / 2;
+  const cy = h / 2;
+  const rCell = Math.min(w, h) * 0.32;  // RBC 半径（像素）
+
+  ctx.save();
+  // 浅色背景
+  ctx.fillStyle = '#FAFAFA';
+  ctx.fillRect(0, 0, w, h);
+
+  // RBC 轮廓
+  ctx.strokeStyle = '#FF8F00';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath(); ctx.arc(cx, cy, rCell, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#FFF8E1';
+  ctx.beginPath(); ctx.arc(cx, cy, rCell, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+  const lam_nm = STATE.lambda_nm;
+  const sigmaFactor = 1100 / lam_nm;  // 波长越短，束腰越小
+
+  if (STATE.geom === 0) {
+    // Point：高斯点
+    const rBeam = rCell * 0.18 * sigmaFactor;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rBeam);
+    g.addColorStop(0, 'rgba(21,96,192,0.95)');
+    g.addColorStop(0.6, 'rgba(21,96,192,0.3)');
+    g.addColorStop(1, 'rgba(21,96,192,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, rBeam, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1565C0';
+    ctx.font = 'bold 12px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Point · 探胞质', cx, cy + rCell + 22);
+  } else if (STATE.geom === 1) {
+    // Donut：环形
+    const rOuter = rCell * 0.45 * sigmaFactor;
+    const rInner = rOuter * 0.18;
+    const g = ctx.createRadialGradient(cx, cy, rInner, cx, cy, rOuter);
+    g.addColorStop(0, 'rgba(46,125,50,0.95)');
+    g.addColorStop(0.6, 'rgba(46,125,50,0.5)');
+    g.addColorStop(1, 'rgba(46,125,50,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, rOuter, 0, Math.PI * 2); ctx.fill();
+
+    // 中心挖空（用背景色覆盖）
+    ctx.fillStyle = '#FAFAFA';
+    ctx.beginPath(); ctx.arc(cx, cy, rInner, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#2E7D32';
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.arc(cx, cy, rInner, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#2E7D32';
+    ctx.font = 'bold 12px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Donut · 专探膜', cx, cy + rCell + 22);
+  } else {
+    // Line：横向线状
+    const lineW = rCell * 1.6;
+    const lineThick = rCell * 0.20 * sigmaFactor;
+    const g = ctx.createLinearGradient(cx - lineW / 2, 0, cx + lineW / 2, 0);
+    g.addColorStop(0, 'rgba(198,40,40,0)');
+    g.addColorStop(0.4, 'rgba(198,40,40,0.95)');
+    g.addColorStop(0.6, 'rgba(198,40,40,0.95)');
+    g.addColorStop(1, 'rgba(198,40,40,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, lineW / 2, lineThick / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#C62828';
+    ctx.font = 'bold 12px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Line · 最全包含 (amide III 尤丰富)', cx, cy + rCell + 22);
+  }
+
+  ctx.fillStyle = '#555';
+  ctx.font = '10px Consolas, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(`λ = ${STATE.lambda_nm} nm（蓝色虚线圆 = RBC 轮廓）`, cx, h - 8);
+  ctx.restore();
+}
+
+/** (D) ν⁴ 律 信号 vs 光损伤 */
+function drawPanelD() {
+  const canvas = document.getElementById('canvas-d');
+  const { ctx, w, h } = setupCanvas(canvas);
+
+  // 扫描 λ
+  const lamMin = 400, lamMax = 1300;
+  // 信号（ν⁴ · 功率密度）相对值
+  const sigData = [];
+  const damData = [];
+  for (let lam = lamMin; lam <= lamMax; lam += 10) {
+    const I_laser_factor = STATE.NA * STATE.NA;
+    const nu4 = Math.pow(1e7 / lam, 4);
+    const sig = nu4 * I_laser_factor;
+    const dmg = Math.pow(1100 / lam, 2) * STATE.power_mW;
+    sigData.push({ x: lam, y: sig });
+    damData.push({ x: lam, y: dmg });
+  }
+  // 归一化到 [0, 100]
+  const sMax = Math.max(...sigData.map(p => p.y));
+  const dMax = Math.max(...damData.map(p => p.y));
+  const normSig = sigData.map(p => ({ x: p.x, y: p.y / sMax * 100 }));
+  const normDam = damData.map(p => ({ x: p.x, y: p.y / dMax * 100 }));
+
+  drawAxes(ctx, lamMin, lamMax, 0, 100, w, h,
+    '激发波长 λ (nm)', '归一化强度 (%)', { xTicks: 6, yTicks: 4, xDecimals: 0 });
+
+  drawLine(ctx, normSig, lamMin, lamMax, 0, 100, w, h,
+    { color: '#6A1B9A', lineWidth: 1.8 });
+  drawLine(ctx, normDam, lamMin, lamMax, 0, 100, w, h,
+    { color: '#FF6F00', lineWidth: 1.4 });
+
+  // 当前 λ 处的竖线
+  const margin = { l: 48, r: 14, t: 12, b: 30 };
+  const px = (x) => margin.l + (x - lamMin) / (lamMax - lamMin) * (w - margin.l - margin.r);
+  const py = (y) => h - margin.b - (y - 0) / 100 * (h - margin.t - margin.b);
+
+  ctx.save();
+  ctx.strokeStyle = '#1565C0';
+  ctx.setLineDash([3, 3]);
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(px(STATE.lambda_nm), margin.t);
+  ctx.lineTo(px(STATE.lambda_nm), h - margin.b);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 工作窗（信号 vs 损伤）合理区间：高 λ 损伤低但信号也低；中 λ 取折中
+  // 用淡绿色背景标记 "常用工作窗" 750-850 nm
+  const xa = px(750), xb = px(850);
+  ctx.fillStyle = 'rgba(46,125,50,0.10)';
+  ctx.fillRect(xa, margin.t, xb - xa, h - margin.b - margin.t);
+
+  ctx.font = '10px Segoe UI, sans-serif';
+  ctx.fillStyle = '#2E7D32';
+  ctx.textAlign = 'center';
+  ctx.fillText('常用工作窗 750–850 nm', (xa + xb) / 2, h - margin.b + 22);
+  ctx.restore();
+
+  // 图例
+  ctx.save();
+  ctx.font = '10px Segoe UI, sans-serif';
+  ctx.fillStyle = '#6A1B9A';
+  ctx.fillRect(w - 150, 14, 12, 3);
+  ctx.fillStyle = '#555'; ctx.fillText('拉曼信号 ∝ ν⁴', w - 132, 16);
+  ctx.fillStyle = '#FF6F00';
+  ctx.fillRect(w - 150, 32, 12, 3);
+  ctx.fillStyle = '#555'; ctx.fillText('相对损伤指数', w - 132, 34);
+  ctx.restore();
+}
+
+// ============================================================
+// 5. 主循环 & 事件
+// ============================================================
+
+function drawAll() {
+  drawPanelA();
+  drawPanelB();
+  drawPanelC();
+  drawPanelD();
+}
+
+const GEOM_LABELS = ['Point', 'Donut', 'Line'];
+
+const sliders = [
+  { id: 'power',  key: 'power_mW',  fmt: (v) => v.toFixed(0) },
+  { id: 'na',     key: 'NA',        fmt: (v) => v.toFixed(2) },
+  { id: 'a',      key: 'a_um',      fmt: (v) => v.toFixed(1) },
+  { id: 'lambda', key: 'lambda_nm', fmt: (v) => v.toFixed(0) },
+  { id: 'geom',   key: 'geom',      fmt: (v) => GEOM_LABELS[Math.round(v)] },
+];
+
+for (const s of sliders) {
+  const el = document.getElementById(s.id);
+  const valEl = document.getElementById(s.id + '-val');
+  el.addEventListener('input', () => {
+    STATE[s.key] = parseFloat(el.value);
+    if (s.key === 'geom') STATE.geom = Math.round(parseFloat(el.value));
+    valEl.textContent = s.fmt(STATE[s.key]);
+    drawAll();
+  });
+}
+
+// 窗口缩放重绘
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => drawAll(), 150);
+});
+
+// 初始化
+drawAll();
+</script>
+</body>
+</html>

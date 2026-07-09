@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 220"
+     font-family="system-ui, -apple-system, 'Segoe UI', 'PingFang SC', sans-serif">
+  <title>LTRS 三种结构光场焦面形态对比：Point / Donut / Line</title>
+  <desc>左侧高斯基模点聚焦（探胞质）；中间涡旋光束环形光阱（专探膜）；右侧光片线聚焦（最全包含）。</desc>
+
+  <defs>
+    <radialGradient id="gaussPt">
+      <stop offset="0%"   stop-color="#1565C0" stop-opacity="0.95"/>
+      <stop offset="60%"  stop-color="#1565C0" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#1565C0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="gaussRing">
+      <stop offset="0%"   stop-color="#2E7D32" stop-opacity="0"/>
+      <stop offset="40%"  stop-color="#2E7D32" stop-opacity="0.9"/>
+      <stop offset="70%"  stop-color="#2E7D32" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#2E7D32" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="donutMask">
+      <rect width="100%" height="100%" fill="white"/>
+      <circle cx="110" cy="115" r="14" fill="black"/>
+    </mask>
+    <linearGradient id="gaussLine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#C62828" stop-opacity="0"/>
+      <stop offset="40%"  stop-color="#C62828" stop-opacity="0.95"/>
+      <stop offset="60%"  stop-color="#C62828" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#C62828" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Panel A: Point -->
+  <g transform="translate(0,0)">
+    <rect x="20" y="20" width="180" height="160" rx="6"
+          fill="#F5F5F5" stroke="#999"/>
+    <text x="110" y="38" text-anchor="middle" font-size="12"
+          font-weight="700" fill="#1565C0">A · Point 点聚焦</text>
+    <text x="110" y="54" text-anchor="middle" font-size="10" fill="#666">高斯基模 TEM₀₀</text>
+    <circle cx="110" cy="115" r="55" fill="url(#gaussPt)"/>
+    <circle cx="110" cy="115" r="46" fill="none" stroke="#FF8F00" stroke-width="1.5"
+            stroke-dasharray="3 3"/>
+    <text x="110" y="118" text-anchor="middle" font-size="9" fill="#333">RBC</text>
+    <text x="110" y="172" text-anchor="middle" font-size="10" fill="#555">仅探胞质（最窄）</text>
+  </g>
+
+  <!-- Panel B: Donut -->
+  <g transform="translate(210,0)">
+    <rect x="20" y="20" width="180" height="160" rx="6"
+          fill="#F5F5F5" stroke="#999"/>
+    <text x="110" y="38" text-anchor="middle" font-size="12"
+          font-weight="700" fill="#2E7D32">B · Donut 甜甜圈</text>
+    <text x="110" y="54" text-anchor="middle" font-size="10" fill="#666">涡旋光束 / LG 模 l≠0</text>
+    <circle cx="110" cy="115" r="55" fill="url(#gaussRing)" mask="url(#donutMask)"/>
+    <circle cx="110" cy="115" r="46" fill="none" stroke="#FF8F00" stroke-width="1.5"
+            stroke-dasharray="3 3"/>
+    <circle cx="110" cy="115" r="14" fill="none" stroke="#2E7D32"
+            stroke-width="1" stroke-dasharray="2 2"/>
+    <text x="110" y="118" text-anchor="middle" font-size="9" fill="#2E7D32">暗核</text>
+    <text x="110" y="172" text-anchor="middle" font-size="10" fill="#555">专探膜（exclusive）</text>
+  </g>
+
+  <!-- Panel C: Line -->
+  <g transform="translate(420,0)">
+    <rect x="20" y="20" width="160" height="160" rx="6"
+          fill="#F5F5F5" stroke="#999"/>
+    <text x="100" y="38" text-anchor="middle" font-size="12"
+          font-weight="700" fill="#C62828">C · Line 线聚焦</text>
+    <text x="100" y="54" text-anchor="middle" font-size="10" fill="#666">光片 / optical sheet</text>
+    <ellipse cx="100" cy="115" rx="62" ry="10" fill="url(#gaussLine)"/>
+    <circle cx="100" cy="115" r="32" fill="none" stroke="#FF8F00" stroke-width="1.5"
+            stroke-dasharray="3 3"/>
+    <text x="100" y="172" text-anchor="middle" font-size="10" fill="#555">最全包含（酰胺 III 丰富）</text>
+  </g>
+</svg>

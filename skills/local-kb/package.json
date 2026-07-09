@@ -1,0 +1,17 @@
+{
+  "name": "local-kb-skill",
+  "version": "0.3.0",
+  "description": "本地信息资源数据库的统一执行入口。scripts/*.ts 是真正的执行层。",
+  "scripts": {
+    "kb:setup": "bun run scripts/setup.ts",
+    "kb:ingest": "bun run scripts/ingest.ts",
+    "kb:query": "bun run scripts/query.ts",
+    "kb:related": "bun run scripts/related.ts",
+    "kb:clean": "bun run scripts/clean.ts",
+    "kb:backup": "bun run scripts/backup.ts"
+  },
+  "keywords": [],
+  "author": "SI_Cheng-Yun",
+  "license": "Mulan PubL v2",
+  "type": "module"
+}

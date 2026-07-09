@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "📚 本地知识库",
+      "description": "本地信息资源数据库的统一执行入口。给文献、健康档案、项目档案、联系人档案等\"长期累积 + 检索 + 反查 + 备份\"场景用。",
+      "skills": ["local-kb"]
+    },
+    {
+      "title": "🔍 OCR 与文档处理",
+      "description": "中文 OCR + PDF 扫描件识别。基于 Python rapidocr-onnxruntime + pymupdf + pdfplumber 单栈流水线，体检报告 / 病历 / 发票 / 书籍通用。",
+      "skills": ["ocr-toolkit"]
+    },
+    {
+      "title": "📝 技术写作",
+      "description": "技术简报撰写 + 可选交互式 HTML 演示。15 章节硬性模板，含依赖地图规则（防教学法漂移），重点支持物理 / 化学 / 光谱 / 计量学等交叉域。",
+      "skills": ["tech-brief-writer"]
+    }
+  ]
+}

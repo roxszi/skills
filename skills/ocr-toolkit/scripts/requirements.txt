@@ -1,0 +1,6 @@
+# OCR 工具箱 · Python 依赖清单
+# 装: pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+rapidocr-onnxruntime==1.4.4   # OCR 引擎(PP-OCRv4 mobile,ONNX Runtime)
+pymupdf>=1.24                 # PDF 渲染 + 文本层提取
+pdfplumber>=0.11              # PDF 文本层 + 表格提取
