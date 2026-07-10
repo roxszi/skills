@@ -3,23 +3,34 @@
  *
  * 用法：
  *   bun run scripts/ingest.ts <kb-path> --meta <meta.yaml>
- *   bun run scripts/ingest.ts <kb-path> --meta <meta.yaml> --print-slug   # 只算 slug
- *   bun run scripts/ingest.ts <kb-path> --mock                            # mock 数据
+ *   bun run scripts/ingest.ts <kb-path> --meta <meta.yaml> --print-slug   # 预校验 + 只算 slug
+ *   bun run scripts/ingest.ts <kb-path> --mock                            # mock 数据（入库后提示清理）
+ *   bun run scripts/ingest.ts <kb-path> --cleanup-mock                    # 清理 mock 数据
  *
  * 流程：
  *   1. 读 schema.yaml / slug_rule.json
- *   2. 读 meta.yaml，校验必填字段
+ *   2. 读 meta.yaml，校验必填字段 + 未知字段（v1.4.0）+ 类型（v1.4.0）
  *   3. 算 slug（按 slug_rule）
- *   4. 冲突检测（unique_fields）
- *   5. mkdir + 写 meta.yaml + 写 content.md（可选）
- *   6. 入库（事务）
- *   7. 输出 inserted/updated 状态
+ *   4. 【v1.5.0 NEW】path / text 字段自动配对加载 + <slug> 占位符展开
+ *   5. 冲突检测（unique_fields）
+ *   6. mkdir + 写 meta.yaml + 写 content.md（可选）
+ *   7. 入库（事务）
+ *   8. 输出 inserted/updated 状态
  *
  * 反模式（直接报错）：
  *   - meta.yaml 缺必填字段 → 报错并列出缺失字段
+ *   - meta.yaml 含未知字段 → 报错（v1.4.0 约定大于配置）
  *   - 算 slug 失败 → 报错
  *   - 库路径不存在 → 报错（提示先跑 setup）
  *   - schema.yaml / slug_rule.json 缺失 → 报错
+ *
+ * v1.5.0 新特性：
+ *   - path/text 自动配对：schema 同时声明 xxx_path + xxx_text(fts:true) 时，
+ *     ingest 自动从 xxx_path 读文件填到 xxx_text（meta.yaml 显式提供的优先）
+ *   - <slug> 占位符：path 字段值中的 <slug> 自动展开为 computedSlug
+ *   - --print-slug 预校验：跑完整 schema 校验，不用真入库就能发现字段问题
+ *   - --cleanup-mock：一键清理 mock 数据（按 slug 模式匹配）
+ *   - --mock 入库后输出清理命令
  */
 
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
@@ -207,6 +218,78 @@ function generateSlug(meta: MetaYaml, slugRule: SlugRule): string {
   return parts.join(slugRule.separator ?? "_");
 }
 
+// ===== v1.5.0 NEW: path / text 字段自动配对加载 =====
+
+/**
+ * 自动加载 path/text 配对字段，并展开 <slug> 占位符。
+ *
+ * 约定：schema 同时声明
+ *   - xxx_path (type: path)
+ *   - xxx_text (type: text, fts: true)
+ * 字段名满足 xxx_path ↔ xxx_text 配对（如 fulltext_path ↔ fulltext_text）。
+ *
+ * 行为：
+ *   1. 展开 path 字段值中的 <slug> 占位符（写入 meta，db 里存展开后的路径）
+ *   2. 若 meta.yaml 没显式提供 xxx_text，则从 xxx_path 指向的文件读取内容填入 xxx_text
+ *   3. 路径相对 rootDir 解析
+ *   4. 文件不存在 → 警告但不 err（xxx_text 保持 null，FTS 不可见该字段）
+ *
+ * 设计理由（约定大于配置）：
+ *   - 不需要 schema 显式声明 "auto_load_from"
+ *   - 字段命名约定已经足够表达意图
+ *   - 用户显式提供的 xxx_text 优先级最高（不被自动加载覆盖）
+ */
+function applyPathTextAutoload(
+  meta: MetaYaml,
+  schema: SchemaYaml,
+  rootDir: string,
+  computedSlug: string,
+): void {
+  const pathFields = (schema.fields.optional ?? []).filter((f) => f.type === "path");
+  const ftsTextFields = (schema.fields.optional ?? []).filter(
+    (f) => f.type === "text" && f.fts,
+  );
+
+  for (const pf of pathFields) {
+    // 约定配对：xxx_path ↔ xxx_text
+    if (!pf.name.endsWith("_path")) continue;
+    const pairName = pf.name.replace(/_path$/, "_text");
+    const tf = ftsTextFields.find((f) => f.name === pairName);
+    if (!tf) continue; // 没有配对的 fts text 字段，跳过
+
+    let pv = meta[pf.name];
+    if (pv === undefined || pv === null) continue;
+    pv = String(pv);
+
+    // 1. 展开 <slug> 占位符
+    if (pv.includes("<slug>")) {
+      pv = pv.replace(/<slug>/g, computedSlug);
+      meta[pf.name] = pv; // db 里存展开后的路径
+      console.log(`>>> 展开 ${pf.name} 占位符：${pv}`);
+    }
+
+    // 2. 自动加载（仅当 meta.yaml 没显式提供 xxx_text）
+    const existingText = meta[tf.name];
+    if (existingText !== undefined && existingText !== null && existingText !== "") {
+      // 用户显式提供的优先，跳过自动加载
+      continue;
+    }
+
+    const fullPath = resolve(rootDir, pv);
+    if (existsSync(fullPath)) {
+      const content = readFileSync(fullPath, "utf-8");
+      meta[tf.name] = content;
+      console.log(
+        `>>> 自动加载 ${tf.name} from ${fullPath} (${content.length} chars)`,
+      );
+    } else {
+      console.warn(
+        `>>> 警告：${pf.name}=${fullPath} 文件不存在，${tf.name} 将为 null（FTS 不可见该字段）`,
+      );
+    }
+  }
+}
+
 // ===== 入库 =====
 
 function ingestOne(kbPath: string, metaPath: string): { slug: string; inserted: boolean; primaryKey: string } {
@@ -227,6 +310,9 @@ function ingestOne(kbPath: string, metaPath: string): { slug: string; inserted: 
   if (!computedSlug) {
     throw new Error("无法生成 slug：meta.yaml 缺少 slug 字段或 slug_rule 必需字段");
   }
+
+  // v1.5.0 NEW: path/text 自动配对加载 + <slug> 占位符展开
+  applyPathTextAutoload(meta, schema, rootDir, computedSlug);
 
   const primaryTable = schema.collection.primary_table;
   const primaryKey = schema.collection.primary_key ?? "slug";
@@ -312,6 +398,7 @@ function ingestOne(kbPath: string, metaPath: string): { slug: string; inserted: 
 
 /**
  * 内置 papers schema mock（向后兼容）。
+ * v1.5.0 FIX: tags → tags_json（v1.4.0 严格校验下，mock 自身也必须用对的字段名）
  */
 function buildPapersMockYaml(): string {
   return `slug: "test_2024_jacs_mock_paper"
@@ -326,7 +413,7 @@ pages: "1000-1010"
 url: "https://example.org/mock"
 fetched_at: "2026-07-08T12:00:00+08:00"
 fetch_method: "mock"
-tags: [SERS, AgNPs, dopamine, electrochemistry]
+tags_json: [SERS, AgNPs, dopamine, electrochemistry]
 abstract: "This is a mock paper for verifying the ingest script works end-to-end. It contains keywords like surface-enhanced Raman scattering and silver nanoparticles for testing FTS5 full-text search."
 `;
 }
@@ -402,6 +489,72 @@ function writeMockMeta(kbPath: string, schemaPath?: string | null): string {
   return metaPath;
 }
 
+// ===== v1.5.0 NEW: mock 数据清理 =====
+
+/**
+ * 清理 mock 数据：按 slug 模式匹配（test_*_mock_* / mock_*_item）。
+ *
+ * 行为：
+ *   1. 从 db 删除匹配的记录
+ *   2. 列出对应的 record 目录（如有），提示用户手动删除
+ *      （不自动删目录，避免误删——让用户确认）
+ */
+function cleanupMock(kbPath: string): { cleaned: number; dirs: string[] } {
+  const { rootDir } = resolveKbPath(kbPath);
+  const schema = loadSchema(rootDir);
+  const primaryTable = schema.collection.primary_table;
+  const primaryKey = schema.collection.primary_key ?? "slug";
+
+  ensureSchema(kbPath);
+  const db = openDb(kbPath);
+  try {
+    // 匹配两种 mock slug 模式
+    const rows = db
+      .prepare(
+        `SELECT ${primaryKey} AS pk FROM ${primaryTable} ` +
+          `WHERE ${primaryKey} LIKE 'test_%\_mock\_%' ESCAPE '\\' ` +
+          `OR ${primaryKey} LIKE 'mock\_%\_item' ESCAPE '\\'`,
+      )
+      .all() as Array<{ pk: string }>;
+
+    if (rows.length === 0) {
+      console.log(">>> 没有 mock 数据需要清理");
+      return { cleaned: 0, dirs: [] };
+    }
+
+    const tx = db.transaction(() => {
+      for (const r of rows) {
+        db.prepare(
+          `DELETE FROM ${primaryTable} WHERE ${primaryKey} = ?`,
+        ).run(r.pk);
+      }
+    });
+    tx();
+
+    const dirs: string[] = [];
+    console.log(`>>> 已从 db 清理 ${rows.length} 条 mock 数据：`);
+    for (const r of rows) {
+      console.log(`    - ${r.pk}`);
+      const recordDir = join(rootDir, r.pk);
+      if (existsSync(recordDir)) {
+        dirs.push(recordDir);
+      }
+    }
+
+    if (dirs.length > 0) {
+      console.log(`>>> 提示：以下 record 目录仍存在，请人工确认后删除（不自动删，防误删）：`);
+      for (const d of dirs) {
+        console.log(`    rm -rf "${d}"`);
+      }
+    }
+
+    console.log(`>>> 建议后续：bun run scripts/backup.ts ${kbPath}`);
+    return { cleaned: rows.length, dirs };
+  } finally {
+    db.close();
+  }
+}
+
 // ===== CLI =====
 
 function parseArgs(): {
@@ -410,12 +563,14 @@ function parseArgs(): {
   mock: boolean;
   mockSchemaPath: string | null;
   printSlug: boolean;
+  cleanupMock: boolean;
 } {
   let kbPath: string | null = null;
   let metaPath: string | null = null;
   let mock = false;
   let mockSchemaPath: string | null = null;
   let printSlug = false;
+  let cleanupMockFlag = false;
   for (let i = 2; i < process.argv.length; i++) {
     const a = process.argv[i];
     const next = process.argv[i + 1];
@@ -430,13 +585,16 @@ function parseArgs(): {
       i++;
     } else if (a === "--print-slug") {
       printSlug = true;
+    } else if (a === "--cleanup-mock") {
+      cleanupMockFlag = true;
     } else if (a === "--help" || a === "-h") {
       console.log(`用法: ingest.ts <kb-path> [options]
   <kb-path>              库路径
   --meta <file>         入库指定的 meta.yaml
   --mock                写入内置 mock meta.yaml（papers schema）并入库（向后兼容）
   --mock --schema <file>  用指定 schema 生成 mock meta.yaml 并入库（改进：适配任意业务）
-  --print-slug          配合 --meta：只打印 slug 后退出（最快算 slug 的方式）
+  --print-slug          配合 --meta：预校验 + 只打印 slug 后退出（v1.5.0 加预校验）
+  --cleanup-mock        清理 mock 数据（按 slug 模式匹配 test_*_mock_* / mock_*_item）
   --help, -h            本帮助
 `);
       process.exit(0);
@@ -444,7 +602,7 @@ function parseArgs(): {
       kbPath = resolve(a);
     }
   }
-  return { kbPath, metaPath, mock, mockSchemaPath, printSlug };
+  return { kbPath, metaPath, mock, mockSchemaPath, printSlug, cleanupMock: cleanupMockFlag };
 }
 
 const args = parseArgs();
@@ -453,16 +611,30 @@ if (!args.kbPath) {
   process.exit(1);
 }
 
-if (args.mock) {
+if (args.cleanupMock) {
+  // v1.5.0 NEW: --cleanup-mock 单独分支（不需要 --meta / --mock）
+  cleanupMock(args.kbPath);
+} else if (args.mock) {
   const metaPath = writeMockMeta(args.kbPath, args.mockSchemaPath);
   console.log(`>>> mock meta.yaml 写入：${metaPath}`);
   const { slug, inserted } = ingestOne(args.kbPath, metaPath);
   console.log(`>>> ${inserted ? "inserted" : "updated"} paper: ${slug}`);
+  // v1.5.0 NEW: mock 入库后输出清理命令
+  console.log(`>>> 警告：mock 数据已入库（${slug}）`);
+  console.log(`>>> 清理：bun run scripts/ingest.ts ${args.kbPath} --cleanup-mock`);
 } else if (args.metaPath) {
   if (args.printSlug) {
     const { rootDir } = resolveKbPath(args.kbPath);
+    // v1.5.0 NEW: --print-slug 也跑校验（不用真入库就能发现字段名 / 类型问题）
+    const schema = loadSchema(rootDir);
     const slugRule = loadSlugRule(rootDir);
     const meta = loadMetaYaml(args.metaPath);
+    const { errors } = validateMeta(meta, schema);
+    if (errors.length > 0) {
+      throw new Error(
+        `meta.yaml 校验失败（--print-slug 预检）：\n${errors.map((e) => `  - ${e}`).join("\n")}`,
+      );
+    }
     const slug = generateSlug(meta, slugRule);
     console.log(slug);
     process.exit(0);

@@ -3,9 +3,8 @@ name: 本地信息资源数据库
 slug: local-kb
 description: 本地信息资源数据库的统一执行入口。当用户提出"建一个本地 X 库 / 做一个 Y 档案 / 存一下这篇 Z / 查一下我的 W / 备份"等指令时调用本 skill。Agent 按 SKILL.md 选对应脚本并执行，**所有具体执行都在 scripts/*.ts 中**——agent 不需要再读 SOUL.md 中关于具体执行的章节，也不需要再读具体业务的 papers/ 或 health_records/ 文档。适用于本地文献库、家人健康档案、本地项目档案、本地联系人档案、本地会议纪要、本地学习笔记、本地实验室台账等任何"长期累积 + 检索 + 反查 + 备份"场景。
 compatibility: bun
-metadata:
-  author: RoxSzi (SI_Cheng-Yun, 司承运)
-  version: 1.3.0
+author: RoxSzi (SI_Cheng-Yun, 司承运)
+version: 1.5.0
 license: MulanPSL v2
 ---
 
@@ -74,14 +73,33 @@ bun run scripts/clean.ts --stdin --from-mcp < raw-mcp.txt > clean.md
 # 入库一条记录
 bun run scripts/ingest.ts <kb-path> --meta <meta.yaml>
 
-# 只算 slug 不入库（先看 slug 再决定）
+# 预校验 + 只算 slug 不入库（v1.5.0+：会跑完整 schema 校验，不用真入库就能发现字段问题）
 bun run scripts/ingest.ts <kb-path> --meta <meta.yaml> --print-slug
 
-# 自测
-bun run scripts/ingest.ts ./test-kb --mock
+# 自测（入库后输出清理命令）
+bun run scripts/ingest.ts <kb-path> --mock
+
+# 清理 mock 数据（v1.5.0+：按 slug 模式匹配 test_*_mock_* / mock_*_item）
+bun run scripts/ingest.ts <kb-path> --cleanup-mock
 ```
 
-meta.yaml 必填字段由 schema.yaml 定义，缺字段会直接报错。
+**字段约束**（v1.4.0+ 严格校验）：
+
+| 校验 | 错误类型 |
+|---|---|
+| 必填字段缺失 | err |
+| 未知字段（不在 schema 白名单）| err（约定大于配置） |
+| 字段类型不匹配 | err |
+
+**v1.5.0+ path/text 自动配对加载**：schema 同时声明 `xxx_path`（type: path）和 `xxx_text`（type: text, fts:true）时，ingest 自动从 `xxx_path` 读文件填到 `xxx_text`。meta.yaml 显式提供的 `xxx_text` 优先（不被覆盖）。
+
+**v1.5.0+ `<slug>` 占位符**：path 字段值中的 `<slug>` 自动展开为 computedSlug。
+
+**path 字段路径解析约定**（v1.5.0+）：
+- 绝对路径直接用
+- 相对路径**相对 rootDir（kb 目录）解析**，不是相对 cwd
+- 例：`fulltext_path: <slug>/fulltext.md` → 解析为 `<kb-path>/<slug>/fulltext.md`
+- 文件不存在 → 警告但不 err（`xxx_text` 为 null，FTS 不可见该字段）
 
 ### 2.4 query —— 反查
 
@@ -113,6 +131,12 @@ bun run scripts/query.ts <kb-path> --pk <slug> --read
 # 列出全部
 bun run scripts/query.ts <kb-path> --all
 ```
+
+> 📌 **`--read` 的全文来源**：query.ts 自动探测 `<record-dir>/fulltext.md` / `content.md` / `正文.md` 按需读取。**即使 db.fulltext_text=null，--read 仍能读全文**。
+>
+> 📌 **FTS 与 fulltext_text 的关系**：`--fts` / `--fts-like` 关键词搜索只走 db 的 fts 字段（如 abstract / fulltext_text）。如果某条记录 fts 字段为 null，FTS 搜不到该记录，但 `--read` 仍可读文件。
+>
+> 📌 **避免 fulltext_text=null**（v1.5.0+）：schema 声明 `fulltext_path` + `fulltext_text(fts:true)` 配对后，ingest 自动加载全文进 FTS 字段。详见 §2.3。
 
 #### 业务别名（推荐）
 
@@ -208,6 +232,8 @@ bun run scripts/backup.ts <kb-path> --dest D:/Backup/my-kb --keep 8
 | 9 | 字段不存在就查询 | `query.ts` 用 PRAGMA 校验 |
 | 10 | 库目录已存在且非空就 setup | `setup.ts` 报错（避免覆盖） |
 | 11 | 业务字段硬编码到脚本 | 别名必须经 `schema.yaml.query_aliases` 声明，脚本不感知任何业务字段；运行时由 `.slug-rule.json` 携带 |
+| 12 | meta.yaml 字段名不在 schema 白名单 | `ingest.ts` v1.4.0+ 直接 err（约定大于配置）；`--print-slug` v1.5.0+ 也会 err |
+| 13 | meta.yaml 改了但 db 数据落后（没重 ingest）| 重新 ingest；或跑 audit.ts 对账（v1.5.1+ 计划）|
 
 ### 4.1 业务别名的"翻译规则"
 
@@ -257,9 +283,12 @@ grep -E "❓|待核实|未知|____" <kb-path>/<slug>/meta.yaml
 ### ingest 完成
 
 - [ ] 来源已 clean（如适用）？
+- [ ] meta.yaml 字段全部在 schema 白名单内（v1.4.0+ 严格校验）？
 - [ ] meta.yaml 必填字段齐全？
-- [ ] slug 已先 `--print-slug` 再 ingest？
+- [ ] slug 已先 `--print-slug` 再 ingest（v1.5.0+ 预校验）？
 - [ ] 唯一字段查重（DOI / 身份证等）？
+- [ ] **FTS 字段入库后实际有内容**（length > 13，排除 "Test abstract" 等占位；不为 null）？
+- [ ] path 字段指向的文件实际存在（ingest 会警告）？
 - [ ] 已按 §3 输出格式讲解？
 - [ ] 回归检查：`grep -E "❓|待核实|未知|____"` 无命中？
 

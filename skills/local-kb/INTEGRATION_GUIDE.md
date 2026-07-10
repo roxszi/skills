@@ -243,6 +243,11 @@ bun run scripts/backup.ts ./your-kb --dest D:/Backup/your-kb --keep 8
 | 12 | **backup.ts 备份按字典序排**（同日多次备份 mtime 全相同） | `copyFileSync` 后必须 `utimesSync(now, now)` 刷 mtime | backup |
 | 13 | **clean.ts 是启发式清理**——残留 ~10% inline JS | 人工 review 必跑 | 抓全文后入库 |
 | 14 | **ACS / 反爬严出版商 fetch 报 403** | fallback 到 browser 路径（详见 Agent FACT.md） | 抓 ACS / Wiley / Elsevier / RSC 全文 |
+| 15 | ~~**ingest.ts 不自动加载 fulltext_text**~~（v1.5.0 前的踩坑） | **v1.5.0 已修复**：schema 配对声明 `xxx_path` + `xxx_text(fts:true)` 后自动加载 | ~~已修复~~ |
+| 16 | **query.ts --read 探测 fulltext.md / content.md / 正文.md 按需读取**（特性，非踩坑） | 即使 db 中 fts 字段为 null，--read 仍能读全文（但 FTS 不可见） | query --read |
+| 17 | ~~**fulltext_path 不支持 `<slug>` 占位符**~~（v1.5.0 前的踩坑） | **v1.5.0 已修复**：path 字段自动展开 `<slug>` | ~~已修复~~ |
+| 18 | **path 字段相对路径基准是 rootDir（kb 目录）**，不是 cwd（v1.5.0+） | meta.yaml 写 `<slug>/fulltext.md`，不写 `papers/<slug>/fulltext.md`（前缀会重复） | 写 meta.yaml path 字段 |
+| 19 | **mock 数据无自动清理**（v1.5.0 前的踩坑） | **v1.5.0 已修复**：`--cleanup-mock` 一键清理；`--mock` 入库后输出清理命令 | 自测入库后 |
 
 > 📌 **本节是 Agent 共享的通用踩坑**。**业务专属踩坑**（如 Agent-Chem 的 "ACS 抓全文"、Agent-Health 的 "iTextSharp PDF 处理"）应放 Agent 自己的 FACT.md。
 
@@ -268,6 +273,9 @@ bun run scripts/backup.ts ./your-kb --dest D:/Backup/your-kb --keep 8
 | `schema version mismatch` | db 与 .schema.sql 版本不一致 | 跑 migrate 脚本（待实现）或删除 db 重 setup |
 | `meta.yaml 缺少必填字段: <name>` | meta.yaml 缺字段 | 补齐 meta.yaml |
 | `meta.yaml contains unknown field(s): <name>` | meta.yaml 字段名不在 schema.yaml 白名单（**约定大于配置**） | 对照 schema.yaml 的 `fields.required` / `fields.optional` 后修正 meta.yaml |
+| `>>> 警告：xxx_path=... 文件不存在`（v1.5.0+） | meta.yaml 的 path 字段指向的文件不存在 | 检查路径是否正确（相对 rootDir 解析）；或接受 xxx_text 为 null |
+| FTS 搜不到某条记录但 --read 能读 | db 中 fts 字段为 null（meta.yaml 未显式提供，且自动加载失败/未配置） | schema 配对声明 path+text 后重 ingest（v1.5.0+ 自动加载） |
+| meta.yaml 改了但 db 数据落后 | 旧版静默忽略未知字段；改后没重新 ingest | 重新 ingest；v1.5.0+ 跑 audit.ts 对账（计划中） |
 | `无法生成 slug` | slug_rule 必需字段都为空 | 检查 meta.yaml |
 | `未找到 FTS5 虚拟表` | 库没启用 FTS5 | schema.yaml 里至少有一个字段标 `fts: true` |
 | backup 失败 `checkpoint busy=1` | 其他连接在写 | 关闭其他连接后重试 |
@@ -284,4 +292,5 @@ bun run scripts/backup.ts ./your-kb --dest D:/Backup/your-kb --keep 8
 | 1.0.0 | 2026-07-08 | **真正重构**：补全 7 个 ts 脚本（setup/ingest/query/related/clean/backup/db），SKILL.md 只剩脚本调用入口 |
 | 1.2.0 | 2026-07-09 | **功能更新**：多项兼容性更新 |
 | 1.3.0 | 2026-07-10 | **业务别名（query_aliases）**：schema.yaml 声明业务别名，脚本运行时自动翻译 |
-| **1.4.0** | **2026-07-10（本次）** | **架构重构**：新增 `template.md` 通用接入指南 + `INTEGRATION_GUIDE.md` 集成指南；ingest.ts 加 meta.yaml 字段名严格校验（约定大于配置） |
+| **1.4.0** | **2026-07-10** | **架构重构**：新增 `template.md` 通用接入指南 + `INTEGRATION_GUIDE.md` 集成指南；ingest.ts 加 meta.yaml 字段名严格校验（约定大于配置） |
+| **1.5.0** | **2026-07-10（本次）** | **执行器增强**（基于 papers 库 audit 发现）：ingest.ts 加 path/text 自动配对加载 + `<slug>` 占位符展开 + `--print-slug` 预校验 + `--cleanup-mock` 子命令 + mock yaml 字段名修正；template.md §7.1 path/text 配对说明；INTEGRATION_GUIDE.md §5 踩坑 #15-#19（部分转为特性）+ §7 故障排查 |

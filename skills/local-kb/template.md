@@ -226,6 +226,46 @@ FTS5 全文检索会让 db 体积略大、写入稍慢。**只对真正需要搜
 | 枚举值（status / type / risk_grade） | ❌ | field / like 查更高效 |
 | 标签数组（tags / diagnosis） | ❌ | json mode 查 |
 
+### 7.1 path / text 字段自动配对加载（v1.5.0+）
+
+很多业务需要管理"大文本"内容（文献全文、笔记内容、报告正文等），同时在 db 里建 FTS 索引。schema 标准写法：
+
+```yaml
+- { name: fulltext_path, type: path }                    # 文件路径
+- { name: fulltext_text, type: text, fts: true }         # 实际全文（FTS 索引）
+```
+
+**约定**：字段名满足 `<X>_path ↔ <X>_text` 配对（如 `fulltext_path` ↔ `fulltext_text`、`content_path` ↔ `content_text`）。
+
+**ingest.ts 自动行为**：
+1. 展开 path 字段值中的 `<slug>` 占位符
+2. 若 meta.yaml 没显式提供 `xxx_text`，则从 `xxx_path` 读文件填入 `xxx_text`
+3. 路径解析：绝对路径直接用；相对路径相对 rootDir（kb 目录）解析
+4. 文件不存在 → 警告但不 err（`xxx_text` 为 null，FTS 不可见该字段）
+
+**meta.yaml 写法**：
+
+```yaml
+# 推荐（简洁）：用 <slug> 占位符，省略 fulltext_text
+fulltext_path: <slug>/fulltext.md
+
+# 显式（优先级高于自动加载，用于覆盖文件内容）
+fulltext_path: <slug>/fulltext.md
+fulltext_text: |
+  这里是显式提供的全文，优先于文件加载
+```
+
+**为什么这样设计**：
+- **约定大于配置**：字段名约定已经表达意图，不需要 schema 显式声明 `auto_load_from`
+- **用户显式优先**：meta.yaml 显式提供的 `xxx_text` 不被覆盖
+- **路径相对 rootDir**：避免 cwd 变化导致行为不可预测
+- **failure 不致命**：文件不存在只警告，不阻塞入库
+
+**与其他机制的协同**：
+- query.ts `--read` 也会探测 `fulltext.md` / `content.md` / `正文.md` 按需读取
+- 即使 `xxx_text=null`，`--read` 仍能读全文（但 FTS 搜不到）
+- 配对加载后 `xxx_text` 有内容，FTS 和 `--read` 都能工作
+
 ---
 
 ## 8. Agent 接入 skill 的标准流程（**核心新增**）
@@ -323,9 +363,11 @@ bun run <skill>/scripts/setup.ts <kb-path> --schema <kb-path>/schema.yaml
 
 - [ ] 来源已 clean（如适用）？
 - [ ] meta.yaml 字段名对齐 schema.yaml（**约定大于配置**——未对齐直接 err，不是 warn）？
-- [ ] slug 已先 `--print-slug` 再 ingest？
+- [ ] slug 已先 `--print-slug` 再 ingest（v1.5.0+ 含预校验）？
 - [ ] 唯一字段查重（DOI / email / 身份证等）？
 - [ ] WAL checkpoint 已跑（防新连接看不到刚 ingest 的行）？
+- [ ] **FTS 字段入库后实际有内容**（length > 13，排除 "Test abstract" 等占位；不为 null）？
+- [ ] path 字段指向的文件实际存在（v1.5.0+ ingest 会警告）？
 - [ ] 已按业务输出格式讲解？
 - [ ] 回归检查：`grep -E "❓|待核实|未知|____" meta.yaml` 无命中？
 
@@ -358,6 +400,9 @@ bun run <skill>/scripts/setup.ts <kb-path> --schema <kb-path>/schema.yaml
 | 9 | **唯一字段变更导致 slug 漂移** | unique_fields 在 schema 里固定下来不要轻易改 | schema 维护 |
 | 10 | **json mode 查询必须传完整字段名**（不是别名） | `--json tags_json --value X` 不是 `--json tags --value X` | query |
 | 11 | **FTS5 中文检索体验差**（unicode61 tokenizer 不分词） | 用 `--fts-like "中文关键词"`（跨字段 LIKE） | 中文查询 |
+| 12 | **path 字段相对路径基准是 rootDir（kb 目录）**（v1.5.0+） | 写 `<slug>/fulltext.md`，不要写 `papers/<slug>/fulltext.md`（前缀会重复） | 写 meta.yaml path 字段 |
+| 13 | **想让 FTS 搜到全文，schema 要配对声明 path+text**（v1.5.0+） | 见 §7.1，配对后 ingest 自动加载 | schema 设计 |
+| 14 | **mock 数据入库后没有自动清理**（v1.5.0 前） | `--cleanup-mock` 一键清理；旧版本手动 `DELETE FROM ... WHERE slug LIKE 'test_%_mock_%'` | 自测入库后 |
 
 ---
 

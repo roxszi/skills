@@ -3,9 +3,8 @@ name: OCR 工具箱
 slug: ocr-toolkit
 description: OCR 工具选型与流水线构建。中文 OCR + PDF 扫描件 + 科研文献 / 书籍 / 体检报告 / 病历 / 发票等场景。基于 Python rapidocr-onnxruntime + pymupdf + pdfplumber 完整流水线。当涉及到"扫描件转文字"、"PDF 文字识别"、"识别图片中的字"等业务时触发。
 compatibility: python
-metadata:
-  author: RoxSzi (SI_Cheng-Yun, 司承运)
-  version: 1.0.2
+author: RoxSzi (SI_Cheng-Yun, 司承运)
+version: 1.0.2
 license: MulanPSL v2
 ---
 
