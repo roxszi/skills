@@ -28,7 +28,38 @@ modifiers:
   indexed: true   # 建索引（无 UNIQUE）
   fts: true       # 加入 FTS5 虚拟表 + 触发器同步
   json: true      # 该字段是 string[]，值以 JSON 字符串存储
+  related: true   # 该字段参与 related.ts 的默认关联发现
 ```
+
+---
+
+## 0.5. 业务别名（query_aliases）
+
+业务方可选地在 schema.yaml 里声明 `query_aliases` 节，让 SOUL / agent / 用户能用业务友好的 flag（`--doi`、`--author`、`--tag`、`--year` 等）替代通用命令。skill 脚本的 parseArgs 会自动翻译成对应的 `--field` / `--like` / `--json` / `--pk` 等模式。
+
+```yaml
+query_aliases:
+  - { name: doi,    field: doi,          mode: field }    # --doi X     →  --field doi --value X
+  - { name: slug,                        mode: pk }       # --slug X    →  --pk X
+  - { name: author, field: first_author, mode: like }     # --author X  →  --like first_author --value X
+  - { name: tag,    field: tags,         mode: json }     # --tag X     →  --json tags --value X
+  - { name: year,   field: year,         mode: field }    # --year X    →  --field year --value X
+  - { name: journal, field: journal,     mode: like }     # --journal X →  --like journal --value X
+```
+
+| mode | 行为 | 必填 field |
+|---|---|---|
+| `field` | 精确匹配 | ✅ |
+| `like` | 模糊匹配（自动加 `%X%`） | ✅ |
+| `json` | JSON 数组成员匹配（自动加 `%"X"%`） | ✅ |
+| `pk` | 直接当主键 | ❌ |
+| `fts-like` | 跨 FTS 字段 LIKE（中文友好） | ❌ |
+| `fts` | FTS5 BM25（英文友好） | ❌ |
+
+**设计原则**：
+- **完全向后兼容**——不配置 `query_aliases` 等同于通用版本，纯通用模式 `--field` / `--like` / `--json` / `--pk` 永远可用
+- **配置在 schema.yaml 而非脚本里**——skill 脚本不感知任何业务字段，业务方通过 schema 定义自己的别名
+- **related.ts 也支持**——给别名时，related 会先按 alias 查主键，再走关联逻辑（例如 `related.ts <kb> --doi 10.xxx` 直接定位记录找关联）
 
 ---
 
@@ -61,6 +92,11 @@ slug_rule:
     - { field: title,        transform: "lower+strip_nonascii+split_space+slice_words(4)+join_underscore" }
   separator: "_"
   unique_fields: [doi]
+
+# 可选：业务别名（让 SOUL / 用户能用 --doi / --slug 等便利 flag）
+query_aliases:
+  - { name: doi,    field: doi,          mode: field }
+  - { name: slug,                         mode: pk }
 ```
 
 ---
@@ -102,6 +138,14 @@ slug_rule:
     - { field: title,        transform: "lower+strip_nonascii+split_space+slice_words(4)+join_underscore" }
   separator: "_"
   unique_fields: [doi]
+
+query_aliases:
+  - { name: doi,     field: doi,           mode: field }
+  - { name: slug,                           mode: pk }
+  - { name: author,  field: first_author,  mode: like }
+  - { name: tag,     field: tags,          mode: json }
+  - { name: year,    field: year,          mode: field }
+  - { name: journal, field: journal,       mode: like }
 ```
 
 ### 2.2 家人健康档案
@@ -136,6 +180,11 @@ slug_rule:
     - { field: title,        transform: "lower+strip_nonascii+split_space+slice_words(4)+join_underscore" }
   separator: "_"
   unique_fields: []
+
+query_aliases:
+  - { name: member,      field: member,       mode: field }
+  - { name: type,        field: record_type,  mode: field }
+  - { name: diagnosis,   field: diagnosis,    mode: json }
 ```
 
 ### 2.3 项目档案库
@@ -165,6 +214,10 @@ slug_rule:
     - { field: title,        transform: "lower+strip_nonascii+split_space+slice_words(4)+join_underscore" }
   separator: "_"
   unique_fields: []
+
+query_aliases:
+  - { name: owner,  field: owner,   mode: field }
+  - { name: status, field: status,  mode: field }
 ```
 
 ### 2.4 联系人 / 客户档案
@@ -195,6 +248,11 @@ slug_rule:
     - { field: name,         transform: "lower+strip_nonascii" }
   separator: "_"
   unique_fields: [email]
+
+query_aliases:
+  - { name: email,   field: email,        mode: field }
+  - { name: org,     field: organization, mode: like }
+  - { name: name,    field: name,         mode: like }
 ```
 
 ### 2.5 学习笔记库
@@ -222,6 +280,9 @@ slug_rule:
     - { field: title,        transform: "lower+strip_nonascii+split_space+slice_words(4)+join_underscore" }
   separator: "_"
   unique_fields: []
+
+query_aliases:
+  - { name: topic, field: topic, mode: like }
 ```
 
 ### 2.6 实验室台账（试剂 / 仪器）
@@ -251,6 +312,10 @@ slug_rule:
     - { field: title,        transform: "lower+strip_nonascii+split_space+slice_words(4)+join_underscore" }
   separator: "_"
   unique_fields: [lot_number]
+
+query_aliases:
+  - { name: lot,   field: lot_number, mode: field }
+  - { name: type,  field: item_type,  mode: field }
 ```
 
 ---
@@ -347,6 +412,7 @@ title 不必开 fts（精确查或 LIKE 即可）。
 - [ ] `collection.primary_table` 已设置（默认 items）
 - [ ] `collection.primary_key` 已设置（默认 slug）
 - [ ] 必填字段 ≤ 5 个，且 schema 与业务匹配
+- [ ] 常用查询字段已配置 `query_aliases`（DOI / email / 主键等，让 SOUL 能用 `--doi` 等业务 flag）
 - [ ] unique 字段标了 `unique: true`（DOI / email / 身份证等）
 - [ ] 需要搜的字段标了 `fts: true`
 - [ ] 标签数组字段标了 `json: true`（tags / diagnoses 等）
@@ -359,6 +425,7 @@ title 不必开 fts（精确查或 LIKE 即可）。
 
 | template.md 章节 | 对应章节 |
 |---|---|
+| §0.5 业务别名 | db.ts loadAliases / setup.ts generateSlugRuleJson / query.ts + related.ts parseArgs |
 | §1 最小配置 | README.md §3.2 / SKILL.md §2.1 |
 | §2 业务示例 | README.md §5 |
 | §3 transform 语法 | setup.ts / ingest.ts |

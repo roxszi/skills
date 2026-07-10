@@ -5,7 +5,7 @@ description: 本地信息资源数据库的统一执行入口。当用户提出"
 compatibility: bun
 metadata:
   author: RoxSzi (SI_Cheng-Yun, 司承运)
-  version: 1.2.0
+  version: 1.3.0
 license: MulanPSL v2
 ---
 
@@ -87,12 +87,35 @@ bun run scripts/query.ts <kb-path> --fts "<text>"
 # FTS5 表达式模式（支持 AND / OR / NEAR，需配合 --fts-expr）
 bun run scripts/query.ts <kb-path> --fts "SERS OR silver" --fts-expr
 
+# 跨 FTS 字段 LIKE（中文友好，FTS5 unicode61 不分词中文时用）
+bun run scripts/query.ts <kb-path> --fts-like "<关键词>"
+
 # 读全文（必须配合 --pk）
 bun run scripts/query.ts <kb-path> --pk <slug> --read
 
 # 列出全部
 bun run scripts/query.ts <kb-path> --all
 ```
+
+#### 业务别名（推荐）
+
+如果 schema.yaml 配置了 `query_aliases`，agent 和用户可以用业务友好的 flag，由脚本自动翻译成通用模式：
+
+```bash
+# 假设 schema.yaml 配置了：
+#   query_aliases:
+#     - { name: doi,    field: doi,          mode: field }
+#     - { name: slug,                         mode: pk }
+#     - { name: author, field: first_author, mode: like }
+#     - { name: tag,    field: tags,         mode: json }
+
+bun run scripts/query.ts <kb-path> --doi 10.1021/...           # 等同 --field doi --value ...
+bun run scripts/query.ts <kb-path> --slug <slug> --read        # 等同 --pk <slug> --read
+bun run scripts/query.ts <kb-path> --author Liu                # 等同 --like first_author --value Liu
+bun run scripts/query.ts <kb-path> --tag SERS                  # 等同 --json tags --value SERS
+```
+
+查看当前库已配置的别名：`bun run scripts/query.ts <kb-path> --help`
 
 ### 2.5 related —— 关联发现
 
@@ -102,6 +125,10 @@ bun run scripts/related.ts <kb-path> --pk <slug>
 
 # 显式指定关联字段（覆盖默认值）
 bun run scripts/related.ts <kb-path> --pk <slug> --fields <f1,f2>
+
+# 用业务别名定位（schema.yaml 配置 query_aliases 后）：
+bun run scripts/related.ts <kb-path> --doi 10.1021/...   # 先按 doi 查主键，再走关联
+bun run scripts/related.ts <kb-path> --tag SERS          # 先按 tag 查到记录，再走关联
 ```
 
 ### 2.6 backup —— 备份
@@ -163,6 +190,22 @@ bun run scripts/backup.ts <kb-path> --dest D:/Backup/my-kb --keep 8
 | 8 | meta.yaml 缺必填字段 | `ingest.ts` 校验失败直接报错 |
 | 9 | 字段不存在就查询 | `query.ts` 用 PRAGMA 校验 |
 | 10 | 库目录已存在且非空就 setup | `setup.ts` 报错（避免覆盖） |
+| 11 | 业务字段硬编码到脚本 | 别名必须经 `schema.yaml.query_aliases` 声明，脚本不感知任何业务字段；运行时由 `.slug-rule.json` 携带 |
+
+### 4.1 业务别名的"翻译规则"
+
+schema.yaml 的 `query_aliases` 节声明后，由 setup.ts 写入 `.slug-rule.json`，再由 query.ts / related.ts 的 parseArgs 在运行时翻译：
+
+| alias.mode | 翻译为 | 必填 field |
+|---|---|---|
+| `field`    | `--field <field> --value <v>`    | ✅ |
+| `like`     | `--like <field> --value <v>`     | ✅ |
+| `json`     | `--json <field> --value <v>`     | ✅ |
+| `pk`       | `--pk <v>`                       | ❌ |
+| `fts-like` | `--fts-like <v>`                 | ❌ |
+| `fts`      | `--fts <v>`                      | ❌ |
+
+related.ts 中所有别名都会先按 mode 查到主键，再走关联逻辑（`pk` 模式等同 `--pk`）。
 
 ---
 

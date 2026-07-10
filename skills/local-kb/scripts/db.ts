@@ -27,6 +27,53 @@ PRAGMA temp_store = MEMORY;
 `;
 
 /**
+ * 业务别名（query / related 共用）。
+ *
+ * 设计目标：让 SOUL / agent / 用户能用 `--doi 10.1021/...`、`--author Li` 这类
+ * 业务友好的 flag，而 skill 脚本本身保持通用（不硬编码任何业务字段）。
+ *
+ * 数据来源：schema.yaml 的 `query_aliases` 节，由 setup.ts 写入 .slug-rule.json。
+ *
+ * 别名命中后的"翻译规则"：
+ *   mode="field"    → query.ts --field <field> --value <v>
+ *   mode="like"     → query.ts --like <field> --value <v>
+ *   mode="json"     → query.ts --json <field> --value <v>
+ *   mode="pk"       → query.ts --pk <v>
+ *   mode="fts-like" → query.ts --fts-like <v>
+ *   mode="fts"      → query.ts --fts <v>
+ *
+ * 在 related.ts 里：所有别名都翻译成"先按 alias.mode 查主键，再走 related 逻辑"。
+ */
+export interface QueryAlias {
+  /** flag 名（不含 --），例如 "doi"、"author"、"tag" */
+  name: string;
+  /** 翻译到的字段名（fts-like / fts / pk 模式下可为空） */
+  field?: string;
+  /** 翻译模式 */
+  mode: "field" | "like" | "json" | "pk" | "fts-like" | "fts";
+}
+
+/**
+ * 从 .slug-rule.json 读 query_aliases。
+ *
+ * 没有配置或文件不存在时返回空数组（完全向后兼容）。
+ */
+export function loadAliases(rootDir: string): QueryAlias[] {
+  const p = `${rootDir}/.slug-rule.json`;
+  if (!existsSync(p)) return [];
+  try {
+    const rule = JSON.parse(readFileSync(p, "utf-8")) as { query_aliases?: QueryAlias[] };
+    if (!Array.isArray(rule.query_aliases)) return [];
+    // 字段校验：只接受 { name, field?, mode } 形状，过滤脏数据
+    return rule.query_aliases.filter(
+      (a) => a && typeof a.name === "string" && typeof a.mode === "string"
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
  * 解析 kb-path：可以是 .db 文件路径，也可以是库根目录（自动追加 /kb.db）。
  *
  *   "C:/Data/MyKB"        → "C:/Data/MyKB/kb.db"

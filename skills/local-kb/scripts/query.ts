@@ -27,7 +27,7 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { resolveKbPath, openDb, searchFts } from "./db.ts";
+import { resolveKbPath, openDb, searchFts, loadAliases, type QueryAlias } from "./db.ts";
 
 // ===== 通用 helpers =====
 
@@ -150,7 +150,32 @@ function printTable(rows: Array<Record<string, unknown>>, columns: string[]): vo
 
 // ===== CLI =====
 
-function parseArgs(): {
+function printHelp(aliases: QueryAlias[]): void {
+  console.log(`用法: query.ts <kb-path> [options]
+  <kb-path>                      库路径
+  --pk <value>                   按主键精确查（如 slug）
+  --field <field> --value <v>    按任意字段精确查（自动校验字段名）
+  --like <field> --value <v>     按任意字段 LIKE 模糊查（单字段）
+  --fts-like "<text>"            跨 FTS 字段 LIKE 模糊查（中文友好）
+  --json <field> --value <v>     按 JSON 数组字段查（如 tags 里的某项，自动校验字段名）
+  --fts "<text>"                 FTS5 全文检索（BM25，phrase 模式默认，英文友好）
+  --fts-expr                     配合 --fts：FTS5 表达式模式（支持 AND / OR / NEAR）
+  --all                          列出全部
+  --read                         配合 --pk（或别名翻译成 pk）：读出 fulltext.md / content.md / 正文.md
+  --help, -h                     本帮助
+`);
+  if (aliases.length > 0) {
+    console.log(`已配置的业务别名（schema.yaml.query_aliases）：`);
+    for (const a of aliases) {
+      const f = a.field ? `${a.field}` : "(无需字段)";
+      console.log(`  --${a.name} <v>  →  ${a.mode} ${f}`);
+    }
+  } else {
+    console.log(`（本库未配置 query_aliases，可参考 template.md §9 添加业务别名）`);
+  }
+}
+
+function parseArgs(aliases: QueryAlias[]): {
   kbPath: string | null;
   mode: "pk" | "field" | "like" | "fts-like" | "json" | "fts" | "all";
   field?: string;
@@ -164,6 +189,10 @@ function parseArgs(): {
   let value: string | undefined;
   let read = false;
   let ftsExpression = false;
+
+  // 业务别名快速查找表：flag 名 → alias 定义
+  const aliasMap = new Map<string, QueryAlias>();
+  for (const a of aliases) aliasMap.set(`--${a.name}`, a);
 
   for (let i = 2; i < process.argv.length; i++) {
     const a = process.argv[i];
@@ -202,20 +231,15 @@ function parseArgs(): {
     } else if (a === "--fts-expr") {
       ftsExpression = true;
     } else if (a === "--help" || a === "-h") {
-      console.log(`用法: query.ts <kb-path> [options]
-  <kb-path>                      库路径
-  --pk <value>                   按主键精确查（如 slug）
-  --field <field> --value <v>    按任意字段精确查（自动校验字段名）
-  --like <field> --value <v>     按任意字段 LIKE 模糊查（单字段）
-  --fts-like "<text>"            跨 FTS 字段 LIKE 模糊查（中文友好）
-  --json <field> --value <v>     按 JSON 数组字段查（如 tags 里的某项，自动校验字段名）
-  --fts "<text>"                 FTS5 全文检索（BM25，phrase 模式默认，英文友好）
-  --fts-expr                     配合 --fts：FTS5 表达式模式（支持 AND / OR / NEAR）
-  --all                          列出全部
-  --read                         配合 --pk：读出 fulltext.md / content.md / 正文.md
-  --help, -h                     本帮助
-`);
+      printHelp(aliases);
       process.exit(0);
+    } else if (aliasMap.has(a) && next) {
+      // 命中业务别名：翻译成通用 mode
+      const al = aliasMap.get(a)!;
+      mode = al.mode;
+      if (al.field) field = al.field;
+      value = next;
+      i++;
     } else if (!kbPath) {
       kbPath = a;
     }
@@ -227,7 +251,20 @@ function parseArgs(): {
   return { kbPath, mode, field, value, read, ftsExpression };
 }
 
-const args = parseArgs();
+// 两阶段 parse：先抽 kbPath（不依赖 alias），再用 alias 解析业务 flag
+function peekKbPath(): string | null {
+  for (let i = 2; i < process.argv.length; i++) {
+    const a = process.argv[i];
+    if (a.startsWith("-")) continue;
+    return a;
+  }
+  return null;
+}
+
+const kbPathOnly = peekKbPath();
+const aliases = kbPathOnly ? loadAliases(resolveKbPath(kbPathOnly).rootDir) : [];
+
+const args = parseArgs(aliases);
 if (!args.kbPath) {
   console.error("需要 <kb-path>");
   process.exit(1);

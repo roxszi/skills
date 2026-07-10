@@ -39,6 +39,23 @@ interface FieldDef {
   related?: boolean;  // 该字段参与 related.ts 的默认关联发现
 }
 
+/**
+ * 业务别名声明。
+ *
+ * schema.yaml 例：
+ *   query_aliases:
+ *     - { name: doi,    field: doi,          mode: field }
+ *     - { name: author, field: first_author, mode: like  }
+ *     - { name: tag,    field: tags,         mode: json  }
+ *
+ * 命中后由 query.ts / related.ts 的 parseArgs 翻译成对应的通用模式。
+ */
+interface QueryAliasDef {
+  name: string;
+  field?: string;
+  mode: "field" | "like" | "json" | "pk" | "fts-like" | "fts";
+}
+
 interface SchemaYaml {
   collection: {
     name: string;
@@ -55,6 +72,7 @@ interface SchemaYaml {
     separator?: string;
     unique_fields?: string[];
   };
+  query_aliases?: QueryAliasDef[];
 }
 
 function loadSchemaYaml(path: string): SchemaYaml {
@@ -182,6 +200,9 @@ function generateSlugRuleJson(schema: SchemaYaml): string {
   const rule: Record<string, unknown> = {
     ...(schema.slug_rule ?? { parts: [], separator: "_" }),
     related_fields: relatedFields,
+    // 业务别名：由 query.ts / related.ts 的 parseArgs 解析
+    // 不配置时为空数组（完全向后兼容）
+    query_aliases: schema.query_aliases ?? [],
   };
   return JSON.stringify(rule, null, 2);
 }
@@ -260,6 +281,13 @@ slug_rule:
     - { field: title,        transform: "lower+strip_nonascii+split_space+slice_words(4)+join_underscore" }
   separator: "_"
   unique_fields: [doi]
+
+query_aliases:
+  - { name: doi,    field: doi,           mode: field }
+  - { name: slug,   mode: pk }
+  - { name: author, field: first_author,  mode: like }
+  - { name: tag,    field: tags,          mode: json }
+  - { name: year,   field: year,          mode: field }
 `;
 }
 

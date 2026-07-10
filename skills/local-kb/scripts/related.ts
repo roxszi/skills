@@ -15,7 +15,7 @@
 
 import { join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
-import { resolveKbPath, openDb } from "./db.ts";
+import { resolveKbPath, openDb, loadAliases, type QueryAlias } from "./db.ts";
 
 function getTableMetadata(db: ReturnType<typeof openDb>): { primaryTable: string; primaryKey: string } {
   const primaryTable =
@@ -38,7 +38,67 @@ function loadRelatedFields(rootDir: string): string[] {
   }
 }
 
-function parseArgs(): {
+/**
+ * 业务别名支持（增强）。
+ *
+ * 用户给 `related.ts <kb-path> --doi 10.1021/...` 时，
+ * 先用 alias.mode 把 value 翻译成主键，再走 related 主逻辑。
+ *
+ * 例如：alias `{ name: "doi", field: "doi", mode: "field" }`
+ *   → SELECT primary_key FROM items WHERE doi = ?
+ *   → 用查到的 slug 继续 related 主逻辑
+ *
+ * 不配置别名时，行为完全等同旧版本（只接受 --pk）。
+ */
+function resolvePkByAlias(
+  db: ReturnType<typeof openDb>,
+  primaryTable: string,
+  primaryKey: string,
+  aliases: QueryAlias[],
+  argv: string[]
+): { pk: string | null; aliasName: string | null } {
+  const aliasMap = new Map<string, QueryAlias>();
+  for (const a of aliases) aliasMap.set(`--${a.name}`, a);
+
+  for (let i = 2; i < argv.length; i++) {
+    const a = argv[i];
+    const next = argv[i + 1];
+    if (!aliasMap.has(a) || !next) continue;
+    const al = aliasMap.get(a)!;
+    if (!al.field) continue; // mode=pk 的别名意义不大，跳过
+    // 只支持精确匹配模式（field / json / like）转主键
+    let row: { pk: string } | undefined;
+    if (al.mode === "field") {
+      row = db
+        .prepare(`SELECT ${primaryKey} AS pk FROM ${primaryTable} WHERE ${al.field} = ?`)
+        .get(next) as { pk: string } | undefined;
+    } else if (al.mode === "like") {
+      row = db
+        .prepare(`SELECT ${primaryKey} AS pk FROM ${primaryTable} WHERE ${al.field} LIKE ?`)
+        .get(`%${next}%`) as { pk: string } | undefined;
+    } else if (al.mode === "json") {
+      row = db
+        .prepare(`SELECT ${primaryKey} AS pk FROM ${primaryTable} WHERE ${al.field} LIKE ?`)
+        .get(`%"${next}"%`) as { pk: string } | undefined;
+    }
+    if (row) return { pk: row.pk, aliasName: al.name };
+    // 命中别名但没找到记录：直接退出，避免误以为 --pk 找不到
+    console.error(`>>> --${al.name} ${next} 未命中任何记录`);
+    process.exit(1);
+  }
+  return { pk: null, aliasName: null };
+}
+
+function peekKbPath(): string | null {
+  for (let i = 2; i < process.argv.length; i++) {
+    const a = process.argv[i];
+    if (a.startsWith("-")) continue;
+    return a;
+  }
+  return null;
+}
+
+function parseArgs(aliases: QueryAlias[]): {
   kbPath: string | null;
   pk: string | null;
   fields: string[];
@@ -46,6 +106,8 @@ function parseArgs(): {
   let kbPath: string | null = null;
   let pk: string | null = null;
   let fields: string[] = [];
+  const aliasMap = new Map<string, QueryAlias>();
+  for (const a of aliases) aliasMap.set(`--${a.name}`, a);
 
   for (let i = 2; i < process.argv.length; i++) {
     const a = process.argv[i];
@@ -60,9 +122,25 @@ function parseArgs(): {
       console.log(`用法: related.ts <kb-path> --pk <slug> [--fields <f1,f2>]
   --pk <slug>                  主键
   --fields <f1,f2,...>         显式指定关联字段（默认读 .slug-rule.json 的 related_fields）
+
+业务别名（如已配置）：
+  related.ts <kb-path> --<alias-name> <value>
+  例如：related.ts <kb-path> --doi 10.1021/... → 先按 doi 查主键，再走关联逻辑
+
   --help, -h                   本帮助
 `);
+      if (aliases.length > 0) {
+        console.log(`已配置的业务别名：`);
+        for (const al of aliases) {
+          const f = al.field ? al.field : "(无需字段)";
+          console.log(`  --${al.name} <v>  →  ${al.mode} ${f}`);
+        }
+      }
       process.exit(0);
+    } else if (aliasMap.has(a)) {
+      // 命中业务别名：在 resolvePkByAlias 阶段处理
+      // 这里跳过 next，避免被当成 kbPath
+      i++;
     } else if (!kbPath) {
       kbPath = a;
     }
@@ -70,9 +148,12 @@ function parseArgs(): {
   return { kbPath, pk, fields };
 }
 
-const args = parseArgs();
-if (!args.kbPath || !args.pk) {
-  console.error("需要 <kb-path> --pk <slug>。--help 查看用法。");
+const kbPathOnly = peekKbPath();
+const aliases = kbPathOnly ? loadAliases(resolveKbPath(kbPathOnly).rootDir) : [];
+
+const args = parseArgs(aliases);
+if (!args.kbPath) {
+  console.error("需要 <kb-path>。--help 查看用法。");
   process.exit(1);
 }
 
@@ -80,6 +161,21 @@ const { rootDir } = resolveKbPath(args.kbPath);
 const db = openDb(args.kbPath, { readonly: true });
 try {
   const { primaryTable, primaryKey } = getTableMetadata(db);
+
+  // 业务别名翻译：用户给 --doi X → 查出真实 slug
+  let pk = args.pk;
+  if (!pk && aliases.length > 0) {
+    const r = resolvePkByAlias(db, primaryTable, primaryKey, aliases, process.argv);
+    pk = r.pk;
+    if (pk && r.aliasName) {
+      console.log(`>>> --${r.aliasName} 解析为主键：${pk}`);
+    }
+  }
+  if (!pk) {
+    console.error("需要 --pk <slug>（或已配置的业务别名）。--help 查看用法。");
+    process.exit(1);
+  }
+  const finalPk = pk;
 
   // 关联字段优先级：--fields > .slug-rule.json 的 related_fields > []
   const fields = args.fields.length > 0
@@ -89,12 +185,12 @@ try {
   // 1. 加载 target
   const target = db
     .prepare(`SELECT * FROM ${primaryTable} WHERE ${primaryKey} = ?`)
-    .get(args.pk) as Record<string, unknown> | undefined;
+    .get(finalPk) as Record<string, unknown> | undefined;
   if (!target) {
-    console.error(`>>> 未找到 ${primaryKey}=${args.pk}`);
+    console.error(`>>> 未找到 ${primaryKey}=${finalPk}`);
     process.exit(1);
   }
-  console.log(`>>> target: ${args.pk}`);
+  console.log(`>>> target: ${finalPk}`);
   if (target.title) console.log(`    ${target.title}`);
   console.log();
 
@@ -120,7 +216,7 @@ try {
       pattern = String(v);
     }
 
-    const rows = db.prepare(sql).all(pattern, args.pk) as Array<Record<string, unknown>>;
+    const rows = db.prepare(sql).all(pattern, finalPk) as Array<Record<string, unknown>>;
     for (const r of rows) {
       const rowPk = String(r[primaryKey]);
       if (!related.has(rowPk)) {

@@ -1,6 +1,6 @@
 {
   "name": "local-kb-skill",
-  "version": "0.3.0",
+  "version": "1.3.0",
   "description": "本地信息资源数据库的统一执行入口。scripts/*.ts 是真正的执行层。",
   "scripts": {
     "kb:setup": "bun run scripts/setup.ts",

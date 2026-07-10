@@ -80,6 +80,13 @@ slug_rule:
     - { field: title,        transform: "lower+strip_nonascii+split_space+slice(0,4)+join_underscore" }
   separator: "_"
   unique_fields: [doi]
+
+query_aliases:
+  - { name: doi,    field: doi,           mode: field }
+  - { name: slug,                          mode: pk }
+  - { name: author, field: first_author,  mode: like }
+  - { name: tag,    field: tags,          mode: json }
+  - { name: year,   field: year,          mode: field }
 ```
 
 ### 3.3 跑 setup 建库
@@ -105,16 +112,20 @@ bun run scripts/setup.ts ./papers --schema ./papers.schema.yaml
 # 入库（先准备好 meta.yaml）
 bun run scripts/ingest.ts ./papers --meta ./meta.yaml
 
-# 反查
+# 反查（schema.yaml 配置 query_aliases 后可用业务 flag）
 bun run scripts/query.ts ./papers --doi 10.1021/...
+bun run scripts/query.ts ./papers --author Smith
+bun run scripts/query.ts ./papers --tag SERS
 bun run scripts/query.ts ./papers --fts "SERS"
 
-# 关联
-bun run scripts/related.ts ./papers --pk smith_2024_jacs_...
+# 关联（别名定位）
+bun run scripts/related.ts ./papers --doi 10.1021/...
 
 # 备份
 bun run scripts/backup.ts ./papers --dest D:/Backup/papers --keep 8
 ```
+
+> 💡 **配置业务别名**：在 schema.yaml 加 `query_aliases` 节，声明常用字段对应的 flag（如 `--doi`、`--author`、`--tag`、`--year`、`--slug`）。setup 写入 `.slug-rule.json` 后，query.ts / related.ts 的 parseArgs 会自动翻译。详见 `template.md §0.5`。
 
 ---
 
@@ -209,6 +220,13 @@ slug_rule:
     - { field: title,        transform: "lower+strip_nonascii+split_space+slice(0,4)+join_underscore" }
   separator: "_"
   unique_fields: [doi]
+
+query_aliases:
+  - { name: doi,    field: doi,           mode: field }
+  - { name: slug,                          mode: pk }
+  - { name: author, field: first_author,  mode: like }
+  - { name: tag,    field: tags,          mode: json }
+  - { name: year,   field: year,          mode: field }
 ```
 
 ### 5.2 家人健康档案
@@ -332,3 +350,4 @@ slug_rule:
 | 0.2.0 | 2026-07-08 | 改为"agent 直接照做的 Markdown 工作流"——**仍然错误**，没有 scripts |
 | 1.0.0 | 2026-07-08 | **真正重构**：补全 7 个 ts 脚本（setup/ingest/query/related/clean/backup/db），SKILL.md 只剩脚本调用入口，README.md 承担用户视角的部署与 SOUL 精简示例 |
 | 1.2.0 | 2026-07-09 | **功能更新**：多项兼容性更新 |
+| 1.3.0 | 2026-07-10 | **业务别名（query_aliases）**：schema.yaml 声明业务别名（`--doi`/`--author`/`--tag` 等），脚本运行时自动翻译成通用模式。skill 脚本本身保持业务无关，业务方通过 schema 定义自己的别名；SOUL.md 可直接用业务 flag，不再需要写 `--field X --value Y` 这种冗长形式 |
