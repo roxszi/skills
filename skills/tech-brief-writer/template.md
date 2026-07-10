@@ -1,9 +1,8 @@
 ---
 文档性质: 技术简报
-建立日期: {YYYY-MM-DD}
-最后修订: {YYYY-MM-DD}（依据 `skills/technical-brief-writer/SKILL.md` v{版本号} 升级：{简述本次改动}）
-作者: {Agent名称} - {Agent平台名称}
-发起人: {用户姓名}
+最后修订日期: { YYYY-MM-DD }
+作者: { Agent名称 - Agent平台名称}
+发起人: { 用户姓名 }
 ---
 
 # {技术名称}技术简报
