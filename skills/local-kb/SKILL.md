@@ -22,6 +22,23 @@ license: MulanPSL v2
 | "OCR 这张图" / "解析这个 PDF" | `clean.ts`（清洗后决定入库）|
 | "备份" / 周期任务 | `backup.ts` |
 
+> 📌 **关于本 skill 的文档分工**（何时读其他文件）：
+>
+> | 你的处境 | 读哪个文件 |
+> |---|---|
+> | 日常执行 setup / ingest / query / related / backup | 只读本文件（SKILL.md） |
+> | 首次接入 skill、定义新业务的 schema | 读 `template.md`（通用字段模板 + 接入流程 + SOUL 声明模板） |
+> | 把 skill 部署到项目、精简现有 SOUL、迁移已有库、排查故障 | 读 `INTEGRATION_GUIDE.md`（架构 + 部署 + 迁移 + 故障 + 通用踩坑） |
+> | meta.yaml 写错字段名、字段类型不匹配、查询不到记录 | 先看本文件 §4 反模式 + §6 自检清单；不行再读 `INTEGRATION_GUIDE.md §7 故障排查` |
+>
+> **本文件不重复的内容**（已分别在 template.md / INTEGRATION_GUIDE.md）：
+> - 通用字段类型 / 修饰符 / transform 语法 → `template.md §1 / §4`
+> - 业务别名 query_aliases 配置 → `template.md §2`
+> - Agent 接入 skill 的标准流程 → `template.md §8`
+> - SOUL.md 声明模板 → `template.md §9`
+> - 通用踩坑清单 → `INTEGRATION_GUIDE.md §5`
+> - 三层架构 / 部署 / SOUL 精简 / 迁移 → `INTEGRATION_GUIDE.md §0 / §3 / §4 / §6`
+
 ---
 
 ## 2. 调用命令

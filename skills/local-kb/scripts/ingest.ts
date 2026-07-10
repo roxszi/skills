@@ -110,6 +110,30 @@ function validateMeta(meta: MetaYaml, schema: SchemaYaml): { missing: string[]; 
   const missing: string[] = [];
   const errors: string[] = [];
 
+  // 0. 未知字段检测（约定大于配置：meta.yaml 字段必须在 schema 白名单）
+  // 防止今天的 silent failure 再次发生：用户写错字段名（如 tags 而不是 tags_json），
+  // 旧逻辑是静默忽略；现在直接 err，列出未知字段名和 schema 合法字段名。
+  // v1.4.0 NEW
+  const allowedFields = new Set<string>();
+  for (const f of schema.fields.required) allowedFields.add(f.name);
+  for (const f of schema.fields.optional ?? []) allowedFields.add(f.name);
+  // primary_key 也是合法字段（meta.yaml 可以显式指定主键值，如中文 slug）
+  if (schema.collection.primary_key) allowedFields.add(schema.collection.primary_key);
+
+  const unknown: string[] = [];
+  for (const k of Object.keys(meta)) {
+    if (!allowedFields.has(k)) {
+      unknown.push(k);
+    }
+  }
+  if (unknown.length > 0) {
+    errors.push(
+      `meta.yaml contains unknown field(s): ${unknown.join(", ")}\n` +
+      `  Schema 合法字段: ${[...allowedFields].sort().join(", ")}\n` +
+      `  请对照 schema.yaml 的 fields.required / fields.optional 后修正 meta.yaml`
+    );
+  }
+
   // 1. 必填字段校验
   for (const f of schema.fields.required) {
     if (meta[f.name] === undefined || meta[f.name] === null || meta[f.name] === "") {
