@@ -40,7 +40,7 @@ import { parseYaml, type YamlObject } from "./yaml.ts";
 
 // ===== Schema / slug rule 加载 =====
 
-interface FieldDef {
+export interface FieldDef {
   name: string;
   type: string;
   unique?: boolean;
@@ -50,7 +50,7 @@ interface FieldDef {
   related?: boolean;
 }
 
-interface SchemaYaml {
+export interface SchemaYaml {
   collection: {
     name: string;
     schema_version: number | string;
@@ -68,19 +68,19 @@ interface SchemaYaml {
   };
 }
 
-interface SlugRule {
+export interface SlugRule {
   parts: Array<{ field: string; transform?: string }>;
   separator: string;
   unique_fields?: string[];
 }
 
-function loadSchema(rootDir: string): SchemaYaml {
+export function loadSchema(rootDir: string): SchemaYaml {
   const p = join(rootDir, "schema.yaml");
   if (!existsSync(p)) throw new Error(`schema.yaml not found: ${p}。请检查 setup 是否完整。`);
   return parseYaml(readFileSync(p, "utf-8")) as unknown as SchemaYaml;
 }
 
-function loadSlugRule(rootDir: string): SlugRule {
+export function loadSlugRule(rootDir: string): SlugRule {
   const p = join(rootDir, ".slug-rule.json");
   if (!existsSync(p)) throw new Error(`.slug-rule.json not found: ${p}。请检查 setup 是否完整。`);
   return JSON.parse(readFileSync(p, "utf-8")) as SlugRule;
@@ -88,12 +88,12 @@ function loadSlugRule(rootDir: string): SlugRule {
 
 // ===== meta.yaml 加载 + 校验 =====
 
-interface MetaYaml {
+export interface MetaYaml {
   [key: string]: unknown;
   slug?: string;
 }
 
-function loadMetaYaml(metaPath: string): MetaYaml {
+export function loadMetaYaml(metaPath: string): MetaYaml {
   if (!existsSync(metaPath)) {
     throw new Error(`meta.yaml not found: ${metaPath}`);
   }
@@ -117,7 +117,7 @@ const VALIDATORS: Record<string, Validator> = {
   "string[]": (v) => Array.isArray(v) ? null : `expected array, got ${typeof v}`,
 };
 
-function validateMeta(meta: MetaYaml, schema: SchemaYaml): { missing: string[]; errors: string[] } {
+export function validateMeta(meta: MetaYaml, schema: SchemaYaml): { missing: string[]; errors: string[] } {
   const missing: string[] = [];
   const errors: string[] = [];
 
@@ -207,7 +207,7 @@ function applyTransform(value: string, transform: string | undefined): string {
   return Array.isArray(s) ? s.join("_") : s;
 }
 
-function generateSlug(meta: MetaYaml, slugRule: SlugRule): string {
+export function generateSlug(meta: MetaYaml, slugRule: SlugRule): string {
   if (meta.slug && typeof meta.slug === "string") return meta.slug;
   const parts: string[] = [];
   for (const p of slugRule.parts) {
@@ -605,43 +605,52 @@ function parseArgs(): {
   return { kbPath, metaPath, mock, mockSchemaPath, printSlug, cleanupMock: cleanupMockFlag };
 }
 
-const args = parseArgs();
-if (!args.kbPath) {
-  console.error("需要 <kb-path>，或 --help");
-  process.exit(1);
+// ===== 入口（仅在直接运行时执行；被 import 时不执行）=====
+
+function main(): void {
+  const args = parseArgs();
+  if (!args.kbPath) {
+    console.error("需要 <kb-path>，或 --help");
+    process.exit(1);
+  }
+
+  if (args.cleanupMock) {
+    // v1.5.0 NEW: --cleanup-mock 单独分支（不需要 --meta / --mock）
+    cleanupMock(args.kbPath);
+  } else if (args.mock) {
+    const metaPath = writeMockMeta(args.kbPath, args.mockSchemaPath);
+    console.log(`>>> mock meta.yaml 写入：${metaPath}`);
+    const { slug, inserted } = ingestOne(args.kbPath, metaPath);
+    console.log(`>>> ${inserted ? "inserted" : "updated"} paper: ${slug}`);
+    // v1.5.0 NEW: mock 入库后输出清理命令
+    console.log(`>>> 警告：mock 数据已入库（${slug}）`);
+    console.log(`>>> 清理：bun run scripts/ingest.ts ${args.kbPath} --cleanup-mock`);
+  } else if (args.metaPath) {
+    if (args.printSlug) {
+      const { rootDir } = resolveKbPath(args.kbPath);
+      // v1.5.0 NEW: --print-slug 也跑校验（不用真入库就能发现字段名 / 类型问题）
+      const schema = loadSchema(rootDir);
+      const slugRule = loadSlugRule(rootDir);
+      const meta = loadMetaYaml(args.metaPath);
+      const { errors } = validateMeta(meta, schema);
+      if (errors.length > 0) {
+        throw new Error(
+          `meta.yaml 校验失败（--print-slug 预检）：\n${errors.map((e) => `  - ${e}`).join("\n")}`,
+        );
+      }
+      const slug = generateSlug(meta, slugRule);
+      console.log(slug);
+      process.exit(0);
+    }
+    const { slug, inserted, primaryKey } = ingestOne(args.kbPath, args.metaPath);
+    console.log(`>>> ${inserted ? "inserted" : "updated"} ${primaryKey}: ${slug}`);
+  } else {
+    console.error("需要 --meta <path> 或 --mock，或 --help");
+    process.exit(1);
+  }
 }
 
-if (args.cleanupMock) {
-  // v1.5.0 NEW: --cleanup-mock 单独分支（不需要 --meta / --mock）
-  cleanupMock(args.kbPath);
-} else if (args.mock) {
-  const metaPath = writeMockMeta(args.kbPath, args.mockSchemaPath);
-  console.log(`>>> mock meta.yaml 写入：${metaPath}`);
-  const { slug, inserted } = ingestOne(args.kbPath, metaPath);
-  console.log(`>>> ${inserted ? "inserted" : "updated"} paper: ${slug}`);
-  // v1.5.0 NEW: mock 入库后输出清理命令
-  console.log(`>>> 警告：mock 数据已入库（${slug}）`);
-  console.log(`>>> 清理：bun run scripts/ingest.ts ${args.kbPath} --cleanup-mock`);
-} else if (args.metaPath) {
-  if (args.printSlug) {
-    const { rootDir } = resolveKbPath(args.kbPath);
-    // v1.5.0 NEW: --print-slug 也跑校验（不用真入库就能发现字段名 / 类型问题）
-    const schema = loadSchema(rootDir);
-    const slugRule = loadSlugRule(rootDir);
-    const meta = loadMetaYaml(args.metaPath);
-    const { errors } = validateMeta(meta, schema);
-    if (errors.length > 0) {
-      throw new Error(
-        `meta.yaml 校验失败（--print-slug 预检）：\n${errors.map((e) => `  - ${e}`).join("\n")}`,
-      );
-    }
-    const slug = generateSlug(meta, slugRule);
-    console.log(slug);
-    process.exit(0);
-  }
-  const { slug, inserted, primaryKey } = ingestOne(args.kbPath, args.metaPath);
-  console.log(`>>> ${inserted ? "inserted" : "updated"} ${primaryKey}: ${slug}`);
-} else {
-  console.error("需要 --meta <path> 或 --mock，或 --help");
-  process.exit(1);
+// v1.5.1: 用 import.meta.main 守护，被 audit.ts import 时不执行入口
+if (import.meta.main) {
+  main();
 }

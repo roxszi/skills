@@ -4,7 +4,7 @@ slug: local-kb
 description: 本地信息资源数据库的统一执行入口。当用户提出"建一个本地 X 库 / 做一个 Y 档案 / 存一下这篇 Z / 查一下我的 W / 备份"等指令时调用本 skill。Agent 按 SKILL.md 选对应脚本并执行，**所有具体执行都在 scripts/*.ts 中**——agent 不需要再读 SOUL.md 中关于具体执行的章节，也不需要再读具体业务的 papers/ 或 health_records/ 文档。适用于本地文献库、家人健康档案、本地项目档案、本地联系人档案、本地会议纪要、本地学习笔记、本地实验室台账等任何"长期累积 + 检索 + 反查 + 备份"场景。
 compatibility: bun
 author: RoxSzi (SI_Cheng-Yun, 司承运)
-version: 1.5.0
+version: 1.5.1
 license: MulanPSL v2
 ---
 
@@ -20,6 +20,7 @@ license: MulanPSL v2
 | "X 和 Y 有什么关系" / "类似的还有什么" | `related.ts` |
 | "OCR 这张图" / "解析这个 PDF" | `clean.ts`（清洗后决定入库）|
 | "备份" / 周期任务 | `backup.ts` |
+| "对账 / 体检 / 检查数据健康度" | `audit.ts`（v1.5.1+）|
 
 > 📌 **关于本 skill 的文档分工**（何时读其他文件）：
 >
@@ -182,6 +183,52 @@ bun run scripts/backup.ts <kb-path>
 bun run scripts/backup.ts <kb-path> --dest D:/Backup/my-kb --keep 8
 ```
 
+### 2.7 audit —— 对账与健康体检（v1.5.1+）
+
+```bash
+# 全量对账（人类可读输出）
+bun run scripts/audit.ts <kb-path>
+
+# JSON 输出（便于其他工具消费 / CI 集成）
+bun run scripts/audit.ts <kb-path> --json
+
+# 只对账特定记录
+bun run scripts/audit.ts <kb-path> --slug <slug>
+
+# 只跑特定维度
+bun run scripts/audit.ts <kb-path> --check <dim>
+```
+
+**对账维度**（`--check` 可选其一）：
+
+| 维度 | 检查内容 |
+|---|---|
+| `schema-fields` | meta.yaml 字段名是否在 schema 白名单 |
+| `db-integrity` | db 必填字段非空 / FTS 字段长度合理 / JSON 字段可解析 |
+| `meta-db` | meta.yaml 数据 vs db 数据一致性（捕获"meta 改了但没重 ingest"）|
+| `file-existence` | path 字段（展开 `<slug>` 后）指向的文件实际存在 |
+| `slug-consistency` | db 主键 vs record 目录名 |
+
+**退出码**（适合 CI / 自动化告警）：
+
+| 退出码 | 含义 |
+|---|---|
+| 0 | 全部健康（无 warning / error） |
+| 1 | 有 warning（需关注） |
+| 2 | 有 error（需修复） |
+| 3 | 参数错误 / 系统错误 |
+
+**设计原则**：
+- **只读**：不修改 meta.yaml / db / 任何文件
+- **维度独立**：每个维度单独可跑（`--check`）
+- **复用 ingest.ts 逻辑**：`loadSchema` / `loadMetaYaml` / `generateSlug` 都从 ingest.ts import，保证对账与入库逻辑同源（不会出现"audit 通过但 ingest 失败"或反之）
+
+**何时跑**：
+- 重大 schema 变更前后
+- 批量 ingest / 重 ingest 前后
+- 定期体检（如每月一次）
+- ingest.ts 升级后（如 v1.4.0 字段名严格校验、v1.5.0 path/text 自动加载——升级后跑 audit 发现历史 silent failure）
+
 ---
 
 ## 3. 输出格式（agent 给用户讲解时按此结构）
@@ -233,7 +280,7 @@ bun run scripts/backup.ts <kb-path> --dest D:/Backup/my-kb --keep 8
 | 10 | 库目录已存在且非空就 setup | `setup.ts` 报错（避免覆盖） |
 | 11 | 业务字段硬编码到脚本 | 别名必须经 `schema.yaml.query_aliases` 声明，脚本不感知任何业务字段；运行时由 `.slug-rule.json` 携带 |
 | 12 | meta.yaml 字段名不在 schema 白名单 | `ingest.ts` v1.4.0+ 直接 err（约定大于配置）；`--print-slug` v1.5.0+ 也会 err |
-| 13 | meta.yaml 改了但 db 数据落后（没重 ingest）| 重新 ingest；或跑 audit.ts 对账（v1.5.1+ 计划）|
+| 13 | meta.yaml 改了但 db 数据落后（没重 ingest）| 重新 ingest；或跑 `audit.ts` 对账（v1.5.1+，维度 `meta-db` 会捕获）|
 
 ### 4.1 业务别名的"翻译规则"
 
@@ -303,3 +350,10 @@ grep -E "❓|待核实|未知|____" <kb-path>/<slug>/meta.yaml
 - [ ] 输出含 `>>> backup OK` + size + verify？
 - [ ] mtime 已刷（ls -la 看 mtime = 现在）？
 - [ ] 备份目录与库物理隔离（不同磁盘）？
+
+### audit 完成（v1.5.1+）
+
+- [ ] 退出码与预期一致（0=健康 / 1=warning / 2=error）？
+- [ ] 维度完整跑（未用 `--check` 缩窄）？
+- [ ] 报告中的 error 已逐一确认修复路径？
+- [ ] 如跑 `--json`，结果已落档（CI / 日志归档）？

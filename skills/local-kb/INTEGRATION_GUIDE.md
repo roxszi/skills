@@ -248,6 +248,7 @@ bun run scripts/backup.ts ./your-kb --dest D:/Backup/your-kb --keep 8
 | 17 | ~~**fulltext_path 不支持 `<slug>` 占位符**~~（v1.5.0 前的踩坑） | **v1.5.0 已修复**：path 字段自动展开 `<slug>` | ~~已修复~~ |
 | 18 | **path 字段相对路径基准是 rootDir（kb 目录）**，不是 cwd（v1.5.0+） | meta.yaml 写 `<slug>/fulltext.md`，不写 `papers/<slug>/fulltext.md`（前缀会重复） | 写 meta.yaml path 字段 |
 | 19 | **mock 数据无自动清理**（v1.5.0 前的踩坑） | **v1.5.0 已修复**：`--cleanup-mock` 一键清理；`--mock` 入库后输出清理命令 | 自测入库后 |
+| 20 | **Windows + Git Bash 环境 `trash` 命令不可用**（违反 user 全局规则"删除必须先确认 + 优先 trash 而非 rm"） | 建仓库根 `.trash/` 目录隔离可疑产物（命名 `<原名>_WrongSlug_<yymmdd>/`）；14+ 天未出现可清理，但**物理删除必须先问用户** | slug 错算返工（如中文 member 经 `strip_nonascii` 变空 → `_checkup_1711`）/ mock 数据清理 / 临时中间产物 |
 
 > 📌 **本节是 Agent 共享的通用踩坑**。**业务专属踩坑**（如 Agent-Chem 的 "ACS 抓全文"、Agent-Health 的 "iTextSharp PDF 处理"）应放 Agent 自己的 FACT.md。
 
@@ -293,4 +294,5 @@ bun run scripts/backup.ts ./your-kb --dest D:/Backup/your-kb --keep 8
 | 1.2.0 | 2026-07-09 | **功能更新**：多项兼容性更新 |
 | 1.3.0 | 2026-07-10 | **业务别名（query_aliases）**：schema.yaml 声明业务别名，脚本运行时自动翻译 |
 | **1.4.0** | **2026-07-10** | **架构重构**：新增 `template.md` 通用接入指南 + `INTEGRATION_GUIDE.md` 集成指南；ingest.ts 加 meta.yaml 字段名严格校验（约定大于配置） |
-| **1.5.0** | **2026-07-10（本次）** | **执行器增强**（基于 papers 库 audit 发现）：ingest.ts 加 path/text 自动配对加载 + `<slug>` 占位符展开 + `--print-slug` 预校验 + `--cleanup-mock` 子命令 + mock yaml 字段名修正；template.md §7.1 path/text 配对说明；INTEGRATION_GUIDE.md §5 踩坑 #15-#19（部分转为特性）+ §7 故障排查 |
+| **1.5.0** | **2026-07-10** | **执行器增强**（基于 papers 库 audit 发现）：ingest.ts 加 path/text 自动配对加载 + `<slug>` 占位符展开 + `--print-slug` 预校验 + `--cleanup-mock` 子命令 + mock yaml 字段名修正；template.md §7.1 path/text 配对说明；INTEGRATION_GUIDE.md §5 踩坑 #15-#19（部分转为特性）+ §7 故障排查 |
+| **1.5.1** | **2026-07-10（本次）** | **对账脚本**：新增 `scripts/audit.ts`（5 维度只读对账 + JSON 输出 + 退出码语义）；ingest.ts 导出 `loadSchema` / `loadSlugRule` / `loadMetaYaml` / `generateSlug` / `validateMeta` + 类型（`SchemaYaml` / `SlugRule` / `MetaYaml`）供 audit.ts 复用；ingest.ts 入口点加 `import.meta.main` 保护（避免被 import 时触发）；SKILL.md §1 触发表 + §2.7 audit 命令文档 + §4 反模式 #13 修订 + §6 自检清单加 audit 章节 |

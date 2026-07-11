@@ -1,14 +1,15 @@
 {
   "name": "local-kb-skill",
-  "version": "1.3.0",
-  "description": "本地信息资源数据库的统一执行入口。scripts/*.ts 是真正的执行层。",
+  "version": "1.5.1",
+  "description": "本地信息资源数据库的统一执行入口（setup / ingest / query / related / clean / backup / audit）。scripts/*.ts 是真正的执行层，SKILL.md 是 agent 入口说明。",
   "scripts": {
     "kb:setup": "bun run scripts/setup.ts",
     "kb:ingest": "bun run scripts/ingest.ts",
     "kb:query": "bun run scripts/query.ts",
     "kb:related": "bun run scripts/related.ts",
     "kb:clean": "bun run scripts/clean.ts",
-    "kb:backup": "bun run scripts/backup.ts"
+    "kb:backup": "bun run scripts/backup.ts",
+    "kb:audit": "bun run scripts/audit.ts"
   },
   "keywords": [],
   "author": "SI_Cheng-Yun",
