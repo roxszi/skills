@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520" font-family="system-ui, -apple-system, 'Segoe UI', 'PingFang SC', sans-serif">
+  <!-- 背景 -->
+  <rect width="800" height="520" fill="#fafafa"/>
+
+  <!-- 标题 -->
+  <text x="400" y="25" text-anchor="middle" font-size="16" font-weight="bold" fill="#212121">SERDS 双波长光谱示意（绝对波数坐标）</text>
+  <text x="400" y="46" text-anchor="middle" font-size="11" fill="#616161">拉曼峰"动"、荧光"不动" → 差分后荧光抵消，拉曼残留为导数峰</text>
+
+  <!-- 共享横轴：绝对波数 ν̃ (cm⁻¹) -->
+  <line x1="80" y1="490" x2="760" y2="490" stroke="#424242" stroke-width="2"/>
+  <polygon points="762,490 752,485 752,495" fill="#424242"/>
+  <text x="400" y="513" text-anchor="middle" font-size="12" font-style="italic" fill="#616161">绝对波数 ν̃ (cm⁻¹)</text>
+
+  <!-- 频率差标注 -->
+  <line x1="340" y1="490" x2="460" y2="490" stroke="#e65100" stroke-width="1.5"/>
+  <line x1="340" y1="486" x2="340" y2="494" stroke="#e65100" stroke-width="1.5"/>
+  <line x1="460" y1="486" x2="460" y2="494" stroke="#e65100" stroke-width="1.5"/>
+  <text x="400" y="482" text-anchor="middle" font-size="10" fill="#e65100">Δν̃_P = 8.1 cm⁻¹</text>
+
+  <!-- ============ 上：S₁(ν̃) λ₁ = 785.4 nm ============ -->
+  <rect x="40" y="65" width="720" height="120" fill="#fff" stroke="#bdbdbd" stroke-width="1" rx="4"/>
+  <text x="60" y="88" font-size="13" font-weight="bold" fill="#1976d2">S₁(ν̃) ─── λ₁ = 785.4 nm 激发</text>
+
+  <!-- 基线 -->
+  <line x1="80" y1="170" x2="760" y2="170" stroke="#bdbdbd" stroke-width="0.5" stroke-dasharray="3,3"/>
+
+  <!-- 荧光背景 -->
+  <rect x="100" y="120" width="640" height="50" fill="#fff3e0" opacity="0.5"/>
+  <text x="720" y="135" text-anchor="end" font-size="10" fill="#ff8f00" font-weight="bold">荧光背景（宽带、平滑）</text>
+
+  <!-- 拉曼峰 1（左）-->
+  <path d="M 280,170 L 290,160 Q 305,140 325,140 Q 345,140 360,160 L 370,170" fill="none" stroke="#1976d2" stroke-width="2.5"/>
+  <text x="325" y="135" text-anchor="middle" font-size="9" fill="#1976d2">Raman₁</text>
+
+  <!-- 拉曼峰 2（右）-->
+  <path d="M 510,170 L 520,160 Q 535,140 555,140 Q 575,140 590,160 L 600,170" fill="none" stroke="#1976d2" stroke-width="2.5"/>
+  <text x="555" y="135" text-anchor="middle" font-size="9" fill="#1976d2">Raman₁'</text>
+
+  <!-- ============ 中：S₂(ν̃) λ₂ = 784.9 nm ============ -->
+  <rect x="40" y="195" width="720" height="120" fill="#fff" stroke="#bdbdbd" stroke-width="1" rx="4"/>
+  <text x="60" y="218" font-size="13" font-weight="bold" fill="#2e7d32">S₂(ν̃) ─── λ₂ = 784.9 nm 激发</text>
+
+  <!-- 基线 -->
+  <line x1="80" y1="300" x2="760" y2="300" stroke="#bdbdbd" stroke-width="0.5" stroke-dasharray="3,3"/>
+
+  <!-- 荧光背景（与上几乎重合）-->
+  <rect x="100" y="250" width="640" height="50" fill="#fff3e0" opacity="0.5"/>
+  <text x="720" y="265" text-anchor="end" font-size="10" fill="#ff8f00">荧光（几乎完全重合）</text>
+
+  <!-- 拉曼峰 1（左偏移 Δν̃_P）-->
+  <path d="M 288,300 L 298,290 Q 313,270 333,270 Q 353,270 368,290 L 378,300" fill="none" stroke="#2e7d32" stroke-width="2.5"/>
+  <text x="333" y="265" text-anchor="middle" font-size="9" fill="#2e7d32">Raman₂（移动 +Δν̃_P）</text>
+
+  <!-- 拉曼峰 2（右偏移 Δν̃_P）-->
+  <path d="M 518,300 L 528,290 Q 543,270 563,270 Q 583,270 598,290 L 608,300" fill="none" stroke="#2e7d32" stroke-width="2.5"/>
+  <text x="563" y="265" text-anchor="middle" font-size="9" fill="#2e7d32">Raman₂'</text>
+
+  <!-- 移动方向箭头 -->
+  <path d="M 380,200 L 388,200" stroke="#e65100" stroke-width="1.5"/>
+  <polygon points="392,200 386,197 386,203" fill="#e65100"/>
+  <text x="395" y="204" text-anchor="start" font-size="9" fill="#e65100">峰值向高波数方向移动</text>
+
+  <!-- ============ 下：ΔS(ν̃) = S₁ − S₂ ============ -->
+  <rect x="40" y="325" width="720" height="150" fill="#e8f5e9" stroke="#2e7d32" stroke-width="1.5" rx="4"/>
+  <text x="60" y="348" font-size="13" font-weight="bold" fill="#1b5e20">ΔS(ν̃) = S₁ − S₂（差分）</text>
+
+  <!-- 基线 -->
+  <line x1="80" y1="430" x2="760" y2="430" stroke="#bdbdbd" stroke-width="0.5" stroke-dasharray="3,3"/>
+
+  <!-- 荧光抵消后的水平线（≈ 0）-->
+  <line x1="100" y1="430" x2="740" y2="430" stroke="#ff8f00" stroke-width="1.5"/>
+  <text x="720" y="425" text-anchor="end" font-size="10" fill="#ff8f00" font-weight="bold">荧光 ≈ 完全抵消</text>
+
+  <!-- 左差分导数峰（S 形）-->
+  <path d="M 290,430 L 305,395 Q 325,385 345,395 L 360,430" fill="none" stroke="#1b5e20" stroke-width="3"/>
+  <text x="325" y="450" text-anchor="middle" font-size="10" fill="#1b5e20" font-weight="bold">导数峰（S 形）</text>
+
+  <!-- 右差分导数峰 -->
+  <path d="M 520,430 L 535,395 Q 555,385 575,395 L 590,430" fill="none" stroke="#1b5e20" stroke-width="3"/>
+  <text x="555" y="450" text-anchor="middle" font-size="10" fill="#1b5e20" font-weight="bold">导数峰</text>
+
+  <!-- 结论框 -->
+  <text x="400" y="375" text-anchor="middle" font-size="11" fill="#1b5e20">✅ 荧光被天然抵消（Kasha 锚定） → 拉曼残留为一阶导数形态</text>
+</svg>
