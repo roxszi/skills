@@ -83,6 +83,10 @@ export function parseYaml(text: string): YamlObject {
   // 预处理 1：识别 "key:" 后面紧跟列表项 / block scalar 的行号
   const keyWithList = new Set<number>();
   const blockScalarMarkers = new Map<number, { indent: number; chomp: "clip" | "strip" | "keep"; folding: boolean }>();
+  // block scalar 内部行号（不含 marker 行）。主循环跳过这些行，避免把 block 内容误解析为 list/kv
+  // 修复场景：`key: |` 内部含 `- item` 或 `nested_key: value` 行时，旧逻辑会进入 listMatch/kvMatch 分支
+  // 把已赋好的字符串值覆盖为 array/object。详见 test case: block scalar 内嵌列表项。
+  const blockScalarInnerLines = new Set<number>();
 
   for (let i = 0; i < rawLines.length; i++) {
     const cur = rawLines[i];
@@ -98,6 +102,18 @@ export function parseYaml(text: string): YamlObject {
       if (blockMatch[3] === "-") chomp = "strip";
       else if (blockMatch[3] === "+") chomp = "keep";
       blockScalarMarkers.set(i, { indent: curIndent, chomp, folding: blockMatch[2] === ">" });
+      // 标记 block scalar 占用的内部行号（与主循环 block scalar 收集逻辑严格一致）
+      for (let j = i + 1; j < rawLines.length; j++) {
+        const next = rawLines[j];
+        if (!next.trim()) {
+          // 空行属于 block scalar 内容（主循环本来也会跳过，加入 Set 不影响行为）
+          blockScalarInnerLines.add(j);
+          continue;
+        }
+        const nextIndent = next.match(/^ */)?.[0].length ?? 0;
+        if (nextIndent <= curIndent) break;
+        blockScalarInnerLines.add(j);
+      }
       continue;
     }
 
@@ -120,6 +136,9 @@ export function parseYaml(text: string): YamlObject {
   for (let li = 0; li < rawLines.length; li++) {
     const raw = rawLines[li];
     if (!raw.trim() || raw.trim().startsWith("#")) continue;
+    // 跳过 block scalar 内部行：这些行已在 block marker 行的收集逻辑里整体作为字符串赋值，
+    // 不应再进入 listMatch / kvMatch 分支（否则会覆盖已赋好的字符串值）。
+    if (blockScalarInnerLines.has(li)) continue;
     const indent = raw.match(/^ */)?.[0].length ?? 0;
     const trimmed = stripInlineComment(raw).trim();
 
