@@ -1,0 +1,29 @@
+{
+  "name": "roxszi-skills",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI 编程 agent 可调用的 skills 集合 — 仓库级元数据维护（自动同步 README / AGENTS）。各 skill 自身的 package.json 见 skills/<slug>/package.json（如 local-kb）。",
+  "scripts": {
+    "build:index": "tsx scripts/build-index.ts",
+    "build:index:dry": "tsx scripts/build-index.ts --dry-run",
+    "build:index:check": "tsx scripts/check-index-sync.ts",
+    "check:index": "tsx scripts/check-index-sync.ts",
+    "simple-git-hooks": "simple-git-hooks"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "simple-git-hooks": "^2.11.0"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm check:index"
+  },
+  "keywords": [
+    "skills",
+    "ai-agent",
+    "claude-code",
+    "cherry-studio"
+  ],
+  "author": "SI_Cheng-Yun (RoxSzi)",
+  "license": "MulanPSL v2"
+}

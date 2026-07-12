@@ -4,7 +4,7 @@ slug: local-kb
 description: 本地信息资源数据库的统一执行入口。当用户提出"建一个本地 X 库 / 做一个 Y 档案 / 存一下这篇 Z / 查一下我的 W / 备份"等指令时调用本 skill。Agent 按 SKILL.md 选对应脚本并执行，**所有具体执行都在 scripts/*.ts 中**——agent 不需要再读 SOUL.md 中关于具体执行的章节，也不需要再读具体业务的 papers/ 或 health_records/ 文档。适用于本地文献库、家人健康档案、本地项目档案、本地联系人档案、本地会议纪要、本地学习笔记、本地实验室台账等任何"长期累积 + 检索 + 反查 + 备份"场景。
 compatibility: bun
 author: RoxSzi (SI_Cheng-Yun, 司承运)
-version: 1.5.2
+version: 1.5.3
 license: MulanPSL v2
 ---
 

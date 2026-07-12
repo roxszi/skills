@@ -34,11 +34,13 @@ npx skills add roxszi/skills --list
 
 ## Skills 总览
 
+<!-- BEGIN: SKILLS-TABLE (auto) -->
 | Skill | 版本 | 触发一句话 | 依赖 |
 |---|---|---|---|
-| [`local-kb`](#-local-kb--本地信息资源数据库-v120) | 1.2.0 | "建一个本地 X 库" / "查一下我的 Y" | Bun ≥ 1.1 |
-| [`ocr-toolkit`](#-ocr-toolkit--ocr-工具箱-v101) | 1.0.1 | "OCR 一下这份体检报告" / "PDF 文字识别" | Python ≥ 3.12 |
-| [`tech-brief-writer`](#-tech-brief-writer--技术简报撰写-v324) | 3.2.4 | "帮我写个技术简报" / "把 XX 整理成备忘" | 无（纯文档 skill） |
+| [`local-kb`](#-local-kb--本地信息资源数据库-v153) | 1.5.3 | "本地信息资源数据库的统一执行入口" | bun |
+| [`ocr-toolkit`](#-ocr-toolkit--OCR 工具箱-v102) | 1.0.2 | "OCR 工具选型与流水线构建" | python |
+| [`tech-brief-writer`](#-tech-brief-writer--技术简报撰写-v360) | 3.6.0 | "技术简报撰写" | — |
+<!-- END: SKILLS-TABLE -->
 
 ---
 
@@ -148,35 +150,33 @@ PDF → pymupdf 判定有无文本层
 
 ## 目录结构
 
+<!-- BEGIN: DIR-TREE (auto) -->
 ```
 skills/
 ├── LICENSE                      # 木兰宽松许可证 v2
-├── README.md                    # 本文件
+├── README.md                    # 本文件（自动渲染 Skills 总览）
+├── AGENTS.md                    # 仓库维护者指南（自动渲染仓库概述）
 ├── .gitignore
+├── scripts/                     # 仓库级脚本（pnpm build:index 等）
 └── skills/
-    ├── local-kb/                # 📚 本地知识库
-    │   ├── SKILL.md             # skill 定义（frontmatter + 章节骨架）
-    │   ├── README.md            # 人类索引
-    │   ├── template.md          # schema.yaml 模板
-    │   ├── package.json
-    │   └── scripts/             # Bun 运行时（setup / clean / ingest / query / related / backup / db / yaml）
-    │
-    ├── ocr-toolkit/             # 🔍 OCR 工具箱
+    ├── local-kb/
+    │   ├── scripts/
+    │   ├── INTEGRATION_GUIDE.md
     │   ├── SKILL.md
+    │   ├── package.json
+    │   └── template.md
+    ├── ocr-toolkit/
+    │   ├── notes/
+    │   ├── scripts/
     │   ├── README.md
-    │   ├── scripts/             # Python 流水线
-    │   │   ├── python_ocr_pipeline.py
-    │   │   ├── pdf_render.py
-    │   │   └── requirements.txt
-    │   ├── notes/               # 踩坑笔记 / 国内源 / 正则模式
-    │   └── test/output/         # 一份完整样本（含体检报告 md / json / txt / png）
-    │
-    └── tech-brief-writer/       # 📝 技术简报撰写
+    │   └── SKILL.md
+    └── tech-brief-writer/
+        ├── LTRS/
+        ├── SERDS/
         ├── SKILL.md
-        ├── template.md          # 15 章节空白模板（与正文 1-to-1 对齐）
-        ├── LTRS-technical-brief/   # 范式产品 1（LTRS + 演示 HTML + SVG 资产）
-        └── SERDS-technical-brief/  # 范式产品 2（SERDS + 演示 HTML）
+        └── template.md
 ```
+<!-- END: DIR-TREE -->
 
 ---
 

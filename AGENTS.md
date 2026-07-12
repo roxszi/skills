@@ -7,13 +7,15 @@
 
 ## 1. 仓库概述
 
-面向 AI 编程 agent 的 skills 集合，3 个 skill：
+面向 AI 编程 agent 的 skills 集合。skill 数与版本由 `scripts/build-index.ts` 自动同步：
 
+<!-- BEGIN: SKILLS-OVERVIEW (auto) -->
 | 目录 | Skill | 版本 | 运行时依赖 |
 |---|---|---|---|
-| `skills/local-kb/` | 本地信息资源数据库 | 1.2.0 | Bun ≥ 1.1 |
-| `skills/ocr-toolkit/` | OCR 工具箱 | 1.0.1 | Python ≥ 3.12 |
-| `skills/tech-brief-writer/` | 技术简报撰写 | 3.2.4 | 纯文档，无运行时依赖 |
+| `skills/local-kb/` | 本地信息资源数据库 | 1.5.3 | bun |
+| `skills/ocr-toolkit/` | OCR 工具箱 | 1.0.2 | python |
+| `skills/tech-brief-writer/` | 技术简报撰写 | 3.6.0 | — |
+<!-- END: SKILLS-OVERVIEW -->
 
 主仓库：[AtomGit](https://atomgit.com/roxszi/skills)（作者国内主用）
 镜像仓库：[GitHub](https://github.com/roxszi/skills)（自动同步，对外发布渠道）
@@ -56,9 +58,13 @@ skills/
 4. **可选补**：`README.md` / `template.md` / `scripts/` / `notes/`
 5. **本地冒烟**：用 `npx skills add ./skills/<skill-name> -y -a claude-code` 试装，验证触发词能自动唤起
 6. **同步更新三个地方**（漏一个 = 文档不一致）：
-   - `skills.sh.json` 的 `groupings[*].skills` 加 skill 名
-   - 根 `README.md` 的「Skills 总览」表格加一行
-   - 本文件 §1 的「仓库概述」表格加一行
+   - `skills.sh.json` 的 `groupings[*].skills` 加 skill 名（**仍需手工**——这是网站分组元数据，自动脚本不接管）
+   - 根 `README.md` 的「Skills 总览」表格 + 「目录结构」块：本目录的 `scripts/build-index.ts` 自动渲染，**新增 / 删除 / 改 version 只需跑一次**：
+     ```bash
+     pnpm build:index         # 实际写入
+     pnpm build:index:dry     # 只打印渲染结果，不改文件（调试用）
+     ```
+   - 本文件 §1 的「仓库概述」表格：同上，由 `build:index` 自动维护
 7. **bump README 顶部安装命令的 skill 计数**
 
 ---
@@ -108,7 +114,7 @@ skills/
 | `version` | ✅ | SemVer，MAJOR/MINOR/PATCH |
 | `license` | ✅ | 本仓库统一 `MulanPSL v2` |
 | `slug` | ⭕ 推荐 | 与目录名一致；缺省时 CLI 用目录名 |
-| `compatibility` | ⭕ 推荐 | 运行时（如 `bun` / `python`），vercel 标准里没有，但建议保留 |
+| `compatibility` | ⭕ 推荐 | 运行时（如 `bun` / `python`），vercel 标准里没有，但建议保留——`scripts/build-index.ts` 会把它作为「依赖」列渲染进 README / AGENTS |
 | `author` | ⭕ 推荐 | 维护者署名 |
 
 ### 6.2 Frontmatter 风格
