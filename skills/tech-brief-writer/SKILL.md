@@ -96,7 +96,7 @@ license: MulanPSL v2
 > 
 > 📌 **目录必填**：位置在 markdown 标题之下，§1 之上。
 
-1. **一句话定义**：blockquote 引用块开篇（中文定义 + 英文全称/缩写）
+1. **一句话定义**：blockquote 引用块开篇（中文定义 + 英文全称/缩写 + 典型应用场景）
 2. **核心技术原理**
    - 问题背景（可用"传统方案 vs 局限"对比表引入痛点）
    - ★ **一个统一核心洞察（single conceptual anchor）**：把整项技术的精髓凝练成**一张表或一句话**（例：SERDS 的"坐标对偶性"——谁不动谁被差分消掉；LTRS 的"梯度力 vs 散射力平衡"）。这是整篇的灵魂锚点，读者记住这一个就抓住了本质。
@@ -354,17 +354,21 @@ DOI / URL 给定
    - 字体用 `font-family="system-ui, -apple-system, 'Segoe UI', 'PingFang SC', sans-serif"` 兜底，**不用等宽字体强行对齐**；
    - 颜色用显式十六进制或 `currentColor`，不依赖外部 CSS class；
    - 文字标注用绝对像素坐标 + `text-anchor="middle/end"`，**不靠字符宽度对齐**。
-4. **生成脚本也存档一份**（`scripts/generate-xx.{html,mjs,ts}`）：
+4. **脚本是否需要存档 & 生成 SVG 的几种方式**：
+   
+   **a) 脚本类型与存档**（命名沿用目录规范的 `scripts/generate-xx.{html,mjs,ts}`）：
    - **首推 .html**：理由见目录规范 callout（"scripts/ 首选 `.html` 的理由"）。
    - **.mjs / .ts**：仅当脚本逻辑重、不需要可视化结果、且团队有 Node 工具链时使用
-   - **数据驱动 SVG**：`echarts` / `@antv/g2` / `D3.js`（CDN 引入即可）
-   - **几何/示意 SVG**：手写即可（参考本 skill 的 `assets/optical-path.svg`）
-   - **浏览器渲染转 SVG**：Playwright（headless 截图 → SVG）
-   - **避免 Python matplotlib / Origin / gnuplot** —— 浏览器/手机/平板/GitHub preview 上 Python 产物无法直接复现
+   
+   **b) 生成 SVG 的几种方式**：
+   - **几何 / 示意 SVG**：手写即可（参考本 skill 的 `assets/optical-path.svg`）。
+   - **数据驱动 SVG**：`echarts` / `@antv/g2`（CDN 引入即可，需设置好默认输出 SVG 而非 canvas）；**D3.js**（天然输出 SVG DOM，零配置）。
+   - **浏览器渲染转 SVG**：Playwright（headless 截图 → PNG/SVG；PNG 需经 svgtrace 等工具栅矢量化）。
+   - **避免 Python matplotlib / Origin / gnuplot** —— 浏览器/手机/平板/GitHub preview 上 Python 产物无法直接复现。
 5. **文件命名示意**（建议风格）：
    - `optical-path.svg` 光路 / 几何示意
    - `trap-geometries.svg` 对比 point / donut / line 等几何形态
-   - `spectrum_soc.svg` 数据谱图（与具体数据强相关）
+   - `spectrum-soc.svg` 数据谱图（与具体数据强相关）
    - `dual-wavelength-spectrum.svg` 双波长光谱示意
    - `potential-well.svg` 势阱 / 势能面
    - `force-balance.svg` 受力分析
@@ -391,9 +395,11 @@ DOI / URL 给定
 
 | 强度 | 判据（满足任一即归此类） |
 |:---|:---|
-| **🔴 强依赖** | ① 没有 B 的核心概念，A 的原理就无法表述<br>② A 的公式里有 B 的物理量作为自变量（且不是直接引用）<br>③ A 的实验结果里反复出现 B 的标志性现象 / 术语<br>④ 简报的"灵魂锚点"必须靠 B 才能讲清楚 |
+| **🔴 强依赖** | ① A 的 §2 原理叙述（不含灵魂锚点）必须靠 B 才能讲清楚<br>② A 的公式里有 B 的物理量作为自变量（且不是直接引用）<br>③ A 的实验结果里反复出现 B 的标志性现象 / 术语<br>④ A 的 §2.2 灵魂锚点的关键推论 / 数据来源必须靠 B 才能成立 |
 | **🟡 弱依赖** | ① 仅在 A 的某一变体或某一章节涉及 B<br>② A 引用 B 作为补充解释，但不展开 |
 | **⚪ 仅提及** | ① A 仅引用 B 作为工具 / 实验条件 / 标准件<br>② B 的存在对理解 A 没有影响 |
+
+> **视角差异**：判据 ① 与 ④ 在多数场景下重合（前者描述 §2 原理叙述，后者锁定 §2.2 灵魂锚点）；视为任一即判定 🔴 强依赖即可。
 
 #### 写作约束
 
@@ -557,7 +563,7 @@ Mermaid 解析器对节点标签、边标签、箭头语法有严格的保留字
 
 | 范式 | 代表性维度 | 新 Agent 应重点学什么 |
 |:---|:---|:---|
-| `LTRS/` | **复杂技术（多原理交叉）的范式** | 灵魂锚点的提炼方式（§2.2 三要素表）、技术变体章节（§5）、依赖地图（§13）的完整结构 |
+| `LTRS/` | **复杂技术（多原理交叉）的范式** | 灵魂锚点的提炼方式（§2.2 四要素表）、技术变体章节（§5）、依赖地图（§13）的完整结构 |
 | `SERDS/` | **单一物理机理的范式** | 一句话锚点（坐标对偶性表）、关键概念的简洁呈现、参考文献分类排列（§10） |
 
 **使用建议**：
