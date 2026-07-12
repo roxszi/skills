@@ -63,8 +63,10 @@ skills/
      ```bash
      pnpm build:index         # 实际写入
      pnpm build:index:dry     # 只打印渲染结果，不改文件（调试用）
+     pnpm check:index         # 只检查一致性，不写文件（pre-commit 会自动跑）
      ```
    - 本文件 §1 的「仓库概述」表格：同上，由 `build:index` 自动维护
+   - ⚠️ **pre-commit hook 已注册**（`.git/hooks/pre-commit` 由 `simple-git-hooks` 写入）：改了 SKILL.md frontmatter 但忘跑 `pnpm build:index` 时 commit 会被挡，提示哪一处 sentinel 不一致。紧急跳过：`SKIP_SIMPLE_GIT_HOOKS=1 git commit ...`
 7. **bump README 顶部安装命令的 skill 计数**
 
 ---
