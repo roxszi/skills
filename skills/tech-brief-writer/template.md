@@ -73,11 +73,11 @@ flowchart TD
 
 ### 3.2 几何 / 谱图示意（外部 SVG）
 
-![{几何/谱图示意}](assets/{xxx_geometric.svg})
+![{几何/谱图示意}](assets/{geometric.svg})
 
 ### 3.3 配套交互演示（可选，但推荐）
 
-🔗 直接打开：`{xxx_demo.html}`（浏览器双击即可，零依赖）
+🔗 直接打开：`交互演示.html`（浏览器双击即可，零依赖）
 
 ---
 
