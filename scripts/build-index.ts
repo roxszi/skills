@@ -77,68 +77,42 @@ function fence(): string {
   return BT + BT + BT;
 }
 
-// ============== GitHub 锚点算法模拟 ==============
+// ============== 标题锚点 slugify ==============
 //
-// [html-pipeline](https://github.com/jch/html-pipeline)（GitHub 内部用）的锚点生成
-// 正则：`[^\w -]`（保留 `\w` + 空格 + `-`，其余删除），随后空格转 `-`、压缩、trim。
+// 模拟 GitHub [html-pipeline](https://github.com/jch/html-pipeline) 锚点算法，
+// 用于从 SKILL.md 主标题 `## <emoji> <name>`（去掉 slug 与破折号的简化格式）生成
+// README 表格里的链接锚点。
 //
-// 为什么不用现成的 github-slugger？那个库是**近似模拟**，对 emoji / 一些 Unicode
-// 字符的处理与 GitHub 真实算法仍有出入（如 issue #54、#56）。本仓库只关心"如何把
-// frontmatter 的 slug + name 转成锚点"，逻辑很窄，自己写更可控。
+// **架构决策（2026-07-13）**：之前的标题格式 `## \`slug\` — <name>` 因为 slug 和
+// 破折号的存在，导致不同平台（GitHub / AtomGit / GitLab）的锚点算法产生不同结果。
+// 现在统一改为 `## <emoji> <name>` 的纯中文标题，slug 移到表格第一列展示。
+// 标题文本 = `emoji + 空格 + 中文名`，跨平台处理高度一致（汉字保留 / emoji 删 / 空格变 -）。
 
 /**
- * 模拟 GitHub 锚点算法处理一段文本：
- *   1. 删除所有不在"字母/数字 + `_` + 空格 + `-`"范围内的字符（emoji / 中文破折号 / 标点等）
- *   2. 每个空白 → `-`（必须用 `\s` 而非 `\s+`，否则连续空白会被压成单个 `-`）
- *   3. 去除首尾 `-`（避免 slug 前后多余空格产生的孤立 `-` 出现）
+ * 把任意文本转为 GitHub 标题锚点兼容的 slug。
  *
- * ⚠️ **不要加"连续 `-` 压缩"步骤！** GitHub 算法不做这个。
- *    真实标题 `## \`local-kb\` — 本地名` 处理后是 `local-kb--本地名`（slug 末尾 `b` + 破折号删后
- *    合并的 2 个空格 → 2 个 `-`），保留 2 个 `-`，压缩会变成 `local-kb-本地名` 与真实算法不符。
+ * 算法（模拟 GitHub html-pipeline）：
+ *   1. 删所有不在"Unicode 字母/数字 + ASCII `_` + 空格 + `-`"范围内的字符
+ *   2. 每个空白 → `-`（用 `\s` 不用 `\s+`，见下方"易踩坑"第 2 条）
+ *   3. trim 首尾孤立 `-`
+ *   4. `.toLowerCase()` —— 对齐 GitHub 的 toLowerCase 步骤
+ *      （避免 `name: OCR 工具箱` 生成 `#OCR-工具箱`，GitHub 真实是 `#ocr-工具箱`）
  *
- * ⚠️ **JS 正则 `\w` 即使加 `u` 标志也只匹配 ASCII `[A-Za-z0-9_]`，不匹配汉字！**
- *    GitHub 用的 Ruby `\w` 带 u 标志匹配 Unicode word（含汉字）——但 JS 没这行为。
- *    本仓库踩过这个坑：用 `\w` 会让汉字被当非 `\w` 删除，锚点只剩 slug。
- *    正确做法：用 `\p{L}\p{N}` 显式匹配 Unicode 字母/数字（必须加 `u` 标志）。
- *    `\p{L}` = 任意语言字母（含汉字）；`\p{N}` = 任意数字。
+ * 返回值**不含 `#` 前缀**，用 `#${slugify(name)}` 拼成完整链接。
+ *
+ * ⚠️ 三个易踩坑：
+ *   1. **JS `\w` 不匹配汉字**——必须用 `\p{L}\p{N}`（Unicode 字母/数字属性类）
+ *      + `u` 标志。即便 `\w` 加 `u` 标志也只匹配 ASCII `[A-Za-z0-9_]`。
+ *   2. **不要用 `\s+` 替换为 `-`**——`\s+` 把多个连续空白一次性替换为单个 `-`，
+ *      而 GitHub 是每个空白独立变 `-`。本仓库之前 fakeTitle 时代需要这个特性。
+ *   3. **不做"连续 `-` 压缩"**——GitHub 算法不压缩，保留原始 `-`。
  */
 function slugify(text: string): string {
   return text
-    .replace(/[^\p{L}\p{N}_ -]/gu, "")  // 步骤 1：删除非 Unicode 字母/数字 + ASCII _/空格/- 的字符
-    .replace(/\s/gu, "-")               // 步骤 2：每个空白 → `-`（无 `+`，避免连续空白压成单个）
-    .replace(/^-+|-+$/gu, "");          // 步骤 3：trim 首尾孤立 `-`
-}
-
-/**
- * 模拟真实标题结构生成 GitHub 锚点。
- *
- * 真实标题样例：`## 📚 `local-kb` — 本地信息资源数据库`
- * 拆解结构：emoji + 空格 + `<slug>` + 空格 + 中文破折号 + 空格 + `<name>`
- *
- * 直接拼 `"#" + slug + "--" + name` 会出错：
- *   - 不处理 name 里的空格（如 `OCR 工具箱`）→ 锚点里出现空格，GitHub 不识别
- *   - 不会自动产生 slug 与 name 之间的 `--`（需要真实算法里的"破折号被删→前后空格合并→变 2 个 -"）
- *
- * 正确做法：构造一个 fakeTitle 还原真实标题的关键结构（emoji 可省，反引号必加，
- * 破折号必加），整体跑 slugify，再加 `#` 前缀。
- *
- * 验证（手算）：
- *   anchorFromTitle("local-kb", "本地信息资源数据库")
- *     → slugify("`local-kb` — 本地信息资源数据库")
- *     → 删 ` 和 `—`：`local-kb  本地信息资源数据库`（注意：破折号被删后前后空格合并为 2 个）
- *     → 空格转 `-`：`local-kb--本地信息资源数据库`
- *     → 加 `#`：`#local-kb--本地信息资源数据库` ✅
- *
- *   anchorFromTitle("ocr-toolkit", "OCR 工具箱")
- *     → slugify("`ocr-toolkit` — OCR 工具箱")
- *     → `ocr-toolkit  OCR 工具箱`
- *     → `ocr-toolkit--OCR-工具箱`
- *     → `#ocr-toolkit--OCR-工具箱` ✅（空格被正确转为 `-`）
- */
-function anchorFromTitle(slug: string, name: string): string {
-  // fakeTitle 用 BT 拼反引号（避免源码内反引号触发 esbuild lexer edge case，见顶部注释）
-  const fakeTitle = BT + slug + BT + " — " + name;
-  return "#" + slugify(fakeTitle);
+    .replace(/[^\p{L}\p{N}_ -]/gu, "")  // 步骤 1：删非 Unicode 字母/数字 + ASCII _/空格/- 的字符
+    .replace(/\s/gu, "-")               // 步骤 2：每个空白 → `-`
+    .replace(/^-+|-+$/gu, "")           // 步骤 3：trim 首尾孤立 `-`
+    .toLowerCase();                     // 步骤 4：对齐 GitHub 的 toLowerCase 步骤
 }
 
 // ============== YAML frontmatter 极简解析 ==============
@@ -250,29 +224,35 @@ export function firstSentence(desc: string, maxLen = 80): string {
 // ============== 渲染块 ==============
 
 /**
- * 渲染 README.md 的「Skills 总览」表 — 含 GitHub 锚点链接。
+ * 渲染 README.md 的「Skills 总览」表 — 含跨平台锚点链接。
  *
- * 锚点必须**对齐 GitHub 真实算法**，否则表格里的链接点不开。
- * GitHub 实际用的是 [html-pipeline](https://github.com/jch/html-pipeline) 的
- * Ruby 正则 `[^\w -]`（保留 `\w` + 空格 + 连字符，其余删除），步骤：
- *   1. 移除 markdown 标记（emoji / 反引号 / 加粗等）
- *   2. 中文破折号 `—` 等标点一律**删除**（不是变 `-`，这是常见误解）
- *   3. 空格 → `-`
- *   4. 连续 `-` 压缩 + trim 首尾
+ * **锚点格式**：`#${slugify(name)}`——直接对 frontmatter 的 `name` 字段做 slugify，
+ * 不拼 slug / 不用 fakeTitle。
+ *
+ * 为什么这么简洁？README 标题格式已统一改为 `## <emoji> <name>`（2026-07-13 架构调整）：
+ *   - 之前：`## 📚 \`local-kb\` — 本地信息资源数据库` —— 含 slug + 中文破折号
+ *   - 现在：`## 📚 本地信息资源数据库` —— 仅 emoji + 中文名
+ *
+ * 收益：
+ *   - **跨平台一致**：汉字 / emoji 在 GitHub / AtomGit / GitLab 处理完全一致
+ *     （汉字保留、emoji 删、空格→-）
+ *   - **slug 信息不丢失**：表格第一列 `` `local-kb` `` 仍展示 slug，目录结构树里也清晰可见
+ *   - **脚本简化**：去掉 fakeTitle 构造逻辑，slugify() 直接对 name 跑就行
+ *   - **永远不踩平台差异坑**：未来平台升级算法也不会影响（锚点 ID 完全由 name 决定）
  *
  * 注意点：
  * - **不嵌版本号**——主标题不带版本号，硬塞会让每次升版本都要改链接
- * - **name 中的空格也要变 `-`**——例如 `name: OCR 工具箱` 必须处理成 `OCR-工具箱`，
- *   否则锚点里会出现空格（点不开）。这是 anchorFromTitle() 的核心职责
- * - **必须整体模拟标题结构**——不能用 `"#" + slug + "--" + name` 硬拼，
- *   那样会忽略"破折号前后空格→两个连字符"的细节
+ * - **name 中的空格自动变 `-`**——例如 `name: OCR 工具箱` → `#ocr-工具箱`
+ *   （slugify 内置空格 → `-` 步骤）
+ * - **大写自动转小写**——`name: OCR 工具箱` → `#ocr-工具箱`（slugify 内置 toLowerCase）
  */
 export function renderSkillsTable(skills: SkillInfo[]): string {
   const lines: string[] = [];
   lines.push("| Skill | 版本 | 触发一句话 | 依赖 |");
   lines.push("|---|---|---|---|");
   for (const s of skills) {
-    const anchor = anchorFromTitle(s.slug, s.name);
+    // 锚点直接对 name 做 slugify（不含 # 前缀），跨平台一致
+    const anchor = "#" + slugify(s.name);
     const link = mdLink(code(s.slug), anchor);
     lines.push(
       "| " + link + " | " + s.version + " | " +

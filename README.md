@@ -13,9 +13,9 @@
 <!-- BEGIN: SKILLS-TABLE (auto) -->
 | Skill | 版本 | 触发一句话 | 依赖 |
 |---|---|---|---|
-| [`local-kb`](#local-kb--本地信息资源数据库) | 1.5.2 | "本地信息资源数据库的统一执行入口" | bun |
-| [`ocr-toolkit`](#ocr-toolkit--OCR-工具箱) | 1.0.2 | "OCR 工具选型与流水线构建" | python |
-| [`tech-brief-writer`](#tech-brief-writer--技术简报撰写) | 3.7.0 | "技术简报撰写" | — |
+| [`local-kb`](#本地信息资源数据库) | 1.5.2 | "本地信息资源数据库的统一执行入口" | bun |
+| [`ocr-toolkit`](#ocr-工具箱) | 1.0.2 | "OCR 工具选型与流水线构建" | python |
+| [`tech-brief-writer`](#技术简报撰写) | 3.7.0 | "技术简报撰写" | — |
 <!-- END: SKILLS-TABLE -->
 
 ---
@@ -44,7 +44,7 @@ npx skills add roxszi/skills --list
 
 ---
 
-## `local-kb` — 本地信息资源数据库
+## 本地信息资源数据库
 
 本地知识库的统一执行入口。给文献、健康档案、项目档案、联系人档案、会议纪要等"长期累积 + 检索 + 反查 + 备份"场景用。
 
@@ -76,7 +76,7 @@ npx skills add roxszi/skills --list
 
 ---
 
-## `ocr-toolkit` — OCR 工具箱
+## OCR 工具箱
 
 中文 OCR + PDF 扫描件 + 科研文献 / 体检报告 / 病历 / 发票等场景。基于 Python `rapidocr-onnxruntime` + `pymupdf` + `pdfplumber`。
 
@@ -96,8 +96,6 @@ PDF → pymupdf 判定有无文本层
        └─ 无 → pymupdf 渲染 200 DPI → rapidocr-onnxruntime 推理（端到端 ~2s）
 ```
 
-**为什么不做 JS/TS 端**：`@techstark/opencv-js` 在 Node + ESM 下有两个 blocker，主流 JS/TS OCR 库（`ppu-paddle-ocr` 等）在 Node 环境不可用。详见 `skills/ocr-toolkit/notes/known_issues.md`。
-
 **附带产物**：
 
 - `scripts/python_ocr_pipeline.py` — 通用流水线（TXT + JSON + Markdown 三件套输出）
@@ -112,7 +110,7 @@ PDF → pymupdf 判定有无文本层
 
 ---
 
-## `tech-brief-writer` — 技术简报撰写
+## 技术简报撰写
 
 为某项技术（尤指物理 / 化学 / 光谱 / 仪器 / 计量学交叉域）撰写"可存档技术简报"。产出 **MD 简报 + 可选交互式 HTML 演示**双件套。
 
@@ -122,7 +120,7 @@ PDF → pymupdf 判定有无文本层
 - "看一下这篇文章用的技术，整理成档案"
 - "把 XX 方法的原理 + 公式 + 应用整理一份 md"
 
-**15 章节硬性模板**（含依赖地图、参考文献独立章节、诚实性红线）：
+**13 章节硬性模板**（含依赖地图、参考文献独立章节、诚实性红线）：
 
 1. 文档头 → 2. 目录 → 3. 一句话定义 → 4. **核心原理**（★ 要求"单一核心洞察"） → 5. **原理示意图**（Mermaid + 外部 SVG） → 6. 基本公式（★ 含算例与适用区间） → 7. 技术变体 → 8. 数据处理算法 → 9. 典型示例应用 → 10. ⚠️ 踩坑框 → 11. 优缺点 → 12. 参考文献（★ DOI 必须核实） → 13. 记忆口诀 → 14. 溯源脚注 → 15. **依赖地图**（★ 防教学法漂移）。
 
