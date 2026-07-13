@@ -37,9 +37,9 @@ npx skills add roxszi/skills --list
 <!-- BEGIN: SKILLS-TABLE (auto) -->
 | Skill | 版本 | 触发一句话 | 依赖 |
 |---|---|---|---|
-| [`local-kb`](#-local-kb--本地信息资源数据库-v152) | 1.5.2 | "本地信息资源数据库的统一执行入口" | bun |
-| [`ocr-toolkit`](#-ocr-toolkit--OCR 工具箱-v102) | 1.0.2 | "OCR 工具选型与流水线构建" | python |
-| [`tech-brief-writer`](#-tech-brief-writer--技术简报撰写-v360) | 3.6.0 | "技术简报撰写" | — |
+| [`local-kb`](#local-kb--本地信息资源数据库) | 1.5.2 | "本地信息资源数据库的统一执行入口" | bun |
+| [`ocr-toolkit`](#ocr-toolkit--OCR 工具箱) | 1.0.2 | "OCR 工具选型与流水线构建" | python |
+| [`tech-brief-writer`](#tech-brief-writer--技术简报撰写) | 3.6.0 | "技术简报撰写" | — |
 <!-- END: SKILLS-TABLE -->
 
 ---

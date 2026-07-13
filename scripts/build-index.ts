@@ -42,8 +42,40 @@ const SKILLS_DIR = join(REPO_ROOT, "skills");
 const README_PATH = join(REPO_ROOT, "README.md");
 const AGENTS_PATH = join(REPO_ROOT, "AGENTS.md");
 
-// ============== Markdown 字符常量（避免 esbuild 0.28 反引号 lexer edge case）==============
-const BT = String.fromCharCode(96);  // 反引号
+// ============== Markdown 字符常量 ==============
+//
+// 为什么用 String.fromCharCode 而不是直接写字面量？
+// 本脚本由 tsx 通过 esbuild 即时编译执行；esbuild 0.28 对某些含反引号
+// ` ` 的特定源码组合存在 lexer edge case，会误判为未闭合模板字符串。
+// 统一用 charcode 拼接规避，全模块只有这几处用法，集中放这里便于维护。
+//
+// 字面量对照：
+//   BT  = `` ` ``（反引号）
+//   LB  = `[`   （左方括号）
+//   RB  = `]`   （右方括号）
+//   LP  = `(`   （左圆括号）
+//   RP  = `)`   （右圆括号）
+//
+const BT = String.fromCharCode(96);  // 反引号 `
+const LB = String.fromCharCode(91);  // 左方括号 [
+const RB = String.fromCharCode(93);  // 右方括号 ]
+const LP = String.fromCharCode(40);  // 左圆括号 (
+const RP = String.fromCharCode(41);  // 右圆括号 )
+
+/** 构造 markdown 链接 `[text](url)` */
+function mdLink(text: string, url: string): string {
+  return LB + text + RB + LP + url + RP;
+}
+
+/** 构造 markdown 内联代码 `` `text` `` */
+function code(text: string): string {
+  return BT + text + BT;
+}
+
+/** 构造 markdown 围栏代码块起始 / 结束的 ```` ``` ```` */
+function fence(): string {
+  return BT + BT + BT;
+}
 
 // ============== YAML frontmatter 极简解析 ==============
 // 只解析 key/value 这种扁平键值对，不引 yaml 包。
@@ -61,15 +93,26 @@ interface Frontmatter {
 
 export function parseFrontmatter(filePath: string): Frontmatter {
   const raw = readFileSync(filePath, "utf-8");
-  // frontmatter 必须以三个连字符起、三个连字符止；本仓库 SKILL.md 全部合规
+  // 匹配整段 frontmatter 区段（--- 起、--- 止）：
+  //   ^---          — 行首必须是三个连字符（frontmatter 起始标志）
+  //   \r?\n         — 兼容 Windows (CRLF) 与 Unix (LF) 换行
+  //   ([\s\S]*?)    — 捕获内容区段；非贪婪 `*?`，避免跨 frontmatter 匹配到下一处 ---
+  //   \r?\n---      — 同样以换行 + 三个连字符结束
+  //   \r?\n         — 末尾换行（frontmatter 后到正文之间）
   const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
   if (!m) throw new Error("未找到 frontmatter：" + filePath);
   const out: Record<string, string> = {};
   for (const line of m[1].split(/\r?\n/)) {
+    // 匹配单行 `key: value`：
+    //   ([a-zA-Z_][a-zA-Z0-9_-]*) — key：字母 / 下划线起，后续允许字母数字下划线连字符
+    //                              （兼容 `key-name`、`frontmatter_v2` 这类带连字符 / 下划线的 key）
+    //   :                          — YAML 的 key/value 分隔符
+    //   \s*                        — 冒号后可零或多个空白
+    //   (.*)$                      — value：行尾前任意内容（不含换行）
     const kv = line.match(/^([a-zA-Z_][a-zA-Z0-9_-]*):\s*(.*)$/);
     if (!kv) continue;
     let v = kv[2].trim();
-    // 去掉包住的引号
+    // 去掉 value 外层包住的引号（单 / 双皆可），避免 `"中文"` 实际被存成 `"中文"`（含字面量引号）
     if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
       v = v.slice(1, -1);
     }
@@ -125,31 +168,56 @@ export function loadSkills(): SkillInfo[] {
  * 例："中文 OCR + PDF 扫描件 ... 触发。" → "中文 OCR + PDF 扫描件 ..."
  */
 export function firstSentence(desc: string, maxLen = 80): string {
+  // 先把任意空白（含换行 / 全角空格 / 制表符）压成单空格，避免 description 跨行导致 trim 失准
   const trimmed = desc.replace(/\s+/g, " ").trim();
+  // 字符类 [^...] 表示"取首个不包含以下字符的最长前缀"：
+  //   。      — 中文句号
+  //   .       — 英文句号
+  //   ! ?     — 英文感叹号 / 问号
+  //   ！？    — 中文感叹号 / 问号
+  //   \n      — 换行兜底（description 通常是单行，但万一跨行也能切）
   const m = trimmed.match(/^[^。.!?！？\n]+/);
   const head = m ? m[0].trim() : trimmed;
   if (head.length <= maxLen) return head;
+  // 超长截断：用省略号收尾（maxLen - 1 是给省略号留位）
   return head.slice(0, maxLen - 1) + "…";
 }
 
 // ============== 渲染块 ==============
 
-/** README.md 的「Skills 总览」表 — 含锚点（带版本号） */
+/**
+ * 渲染 README.md 的「Skills 总览」表 — 含 GitHub 锚点链接。
+ *
+ * 锚点格式：`#<slug>--<name>`，**不带版本号**。
+ *
+ * 为什么这样拼？锚点必须**对齐 GitHub 真实算法**，否则表格里的链接点不开。
+ * GitHub 实际用的是 [html-pipeline](https://github.com/jch/html-pipeline) 的
+ * Ruby 正则 `[^\w -]`（保留 `\w` + 空格 + 连字符，其余删除），步骤：
+ *   1. 移除 markdown 标记（emoji / 反引号 / 加粗等）
+ *   2. 中文破折号 `—` 等标点一律**删除**（不是变 `-`，这是常见误解）
+ *   3. 空格 → `-`
+ *   4. 连续 `-` 压缩 + trim 首尾
+ *
+ * 真实标题样例：
+ *   `## 📚 `local-kb` — 本地信息资源数据库`
+ *   ↓ emoji 删除、反引号删除、破折号删除
+ *   ↓ 空格转 `-`
+ *   `local-kb--本地信息资源数据库`
+ *   ↓ 加 `#` 前缀（slug 自带 `-`）
+ *   `#local-kb--本地信息资源数据库`
+ *
+ * 注意点：
+ * - **不嵌版本号**——主标题不带版本号，硬塞会让每次升版本都要改链接
+ * - **slug 自带连字符**——`local-kb` 已经有一个 `-`，再加上 slug 和 name 之间的两个空格
+ *   压成的 `--`，恰好构成 `#local-kb--中文名`
+ */
 export function renderSkillsTable(skills: SkillInfo[]): string {
   const lines: string[] = [];
   lines.push("| Skill | 版本 | 触发一句话 | 依赖 |");
   lines.push("|---|---|---|---|");
   for (const s of skills) {
-    // 锚点 = # <skill-名-slug>--<中文名>-v<版本号去掉点>
-    // 例如：#-local-kb--本地信息资源数据库-v152
-    const verAnchor = s.version.replace(/\./g, "");
-    const anchor = "#-" + s.slug + "--" + s.name + "-v" + verAnchor;
-    // 用 String.fromCharCode 构造 markdown 链接（避免 esbuild 反引号 lexer edge case）
-    const LB = String.fromCharCode(91);  // 左方括号
-    const RB = String.fromCharCode(93);  // 右方括号
-    const LP = String.fromCharCode(40);  // 左圆括号
-    const RP = String.fromCharCode(41);  // 右圆括号
-    const link = LB + BT + s.slug + BT + RB + LP + anchor + RP;
+    const anchor = "#" + s.slug + "--" + s.name;
+    const link = mdLink(code(s.slug), anchor);
     lines.push(
       "| " + link + " | " + s.version + " | " +
         '"' + firstSentence(s.description) + '" | ' +
@@ -165,7 +233,8 @@ export function renderOverviewTable(skills: SkillInfo[]): string {
   lines.push("| 目录 | Skill | 版本 | 运行时依赖 |");
   lines.push("|---|---|---|---|");
   for (const s of skills) {
-    lines.push("| " + BT + "skills/" + s.slug + "/" + BT + " | " + s.name + " | " + s.version + " | " + s.compatibility + " |");
+    // 用 code() 把路径包成 `` `skills/<slug>/` ``，鼠标悬停可看到等宽字体的完整路径
+    lines.push("| " + code("skills/" + s.slug + "/") + " | " + s.name + " | " + s.version + " | " + s.compatibility + " |");
   }
   return lines.join("\n");
 }
@@ -173,7 +242,7 @@ export function renderOverviewTable(skills: SkillInfo[]): string {
 /** README.md 的「目录结构」块 — 按真实 ls 渲染（深度 2） */
 export function renderDirTree(skills: SkillInfo[]): string {
   const lines: string[] = [];
-  lines.push(BT + BT + BT);
+  lines.push(fence());  // 围栏代码块起始 ```（避免子目录里有 markdown 标记被误解析）
   lines.push("skills/");
   lines.push("├── LICENSE                      # 木兰宽松许可证 v2");
   lines.push("├── README.md                    # 本文件（自动渲染 Skills 总览）");
@@ -194,7 +263,7 @@ export function renderDirTree(skills: SkillInfo[]): string {
       lines.push(subPrefix + (subLast ? "└── " : "├── ") + e);
     }
   }
-  lines.push(BT + BT + BT);
+  lines.push(fence());  // 围栏代码块结束 ```
   return lines.join("\n");
 }
 
@@ -227,14 +296,19 @@ export function listSubDir(slugDir: string): string[] {
  */
 export function replaceSentinel(filePath: string, key: string, newContent: string): boolean {
   const text = readFileSync(filePath, "utf-8");
+  // BEGIN 标记正则：`<!-- BEGIN: <KEY> (auto|manual|...) -->`
+  //   \\s*\\([^)]*\\) — 可选的 `(...)` 注释（任意非 `)` 字符），比如本仓库的 `(auto)`
+  //                   注意 `[^)]*` 而非 `.*?`：不允许嵌套括号，但本仓库的 sentinel 不会出现
+  //   \\s*            — `-->` 前可有空白
   const beginRe = new RegExp(`<!-- BEGIN: ${key}(?:\\s*\\([^)]*\\))?\\s*-->`, "g");
+  // END 标记正则：`<!-- END: <KEY> -->` — 约定 END 不带 `(auto)` 等注释，比 BEGIN 更严格
   const endRe = new RegExp(`<!-- END: ${key}\\s*-->`, "g");
   const beginMatch = beginRe.exec(text);
   if (!beginMatch) return false;
-  // 从 BEGIN 之后开始找 END
+  // 从 BEGIN 标记末尾之后开始找 END，避免误把更早的 END 标记当当前区间的结束
   const beginEnd = beginMatch.index + beginMatch[0].length;
   const rest = text.slice(beginEnd);
-  endRe.lastIndex = 0;
+  endRe.lastIndex = 0;  // 重置 lastIndex：新字符串上重新搜索
   const endMatch = endRe.exec(rest);
   if (!endMatch) {
     throw new Error("sentinel 未闭合：" + key + " in " + filePath);
