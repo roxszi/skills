@@ -7,8 +7,8 @@
 
 <!-- ⚙ 工程化交互演示骨架（template.html）· tech-brief-writer skill v3.8.0
      复制本文件 → 重命名为「交互演示.html」→ 替换所有 {占位符}
-     ⚙ 复制后请删除所有「⚙」标记的开发注释（顶部 + sidebar 备忘）
-     完整规范见 SKILL.md §二「工程化样式框架」与「反模式 A/B/C」
+     ⚙ 复制后请删除所有「⚙」标记的备忘（顶部 + sidebar 备忘）
+     完整规范见 SKILL.md §二「工程化样式框架」与「反模式 A-D」
 -->
 
 <style>
@@ -249,9 +249,9 @@
       <input type="range" id="param2" min="0.1" max="3.0" step="0.1" value="1.0">
     </div>
 
-    <!-- ⚙ 反模式 C 教学示例：开发注释应放 HTML 注释里（用户看不见）
-         复制本模板做新演示时，请删除此开发备忘块。
-         判断标准：这段文字去掉后用户会不会困惑？不会 = 开发注释。
+    <!-- ⚙ 反模式 C 教学示例：备忘应放 HTML 注释里（最终用户看不见）
+         复制本模板做新演示时，请删除此备忘块。
+         判断标准：这段文字去掉后用户会不会困惑？不会 = 备忘。
          桌面端：滑块固定在左侧（.demo-controls sticky top:80px，避开 header）
          移动端：滑块在顶部（@media max-width: 768px → position: static） -->
   </aside>
@@ -291,12 +291,13 @@
 <!-- =====================================================================
      Footer（可传播三要素：Agent / 平台 / Skill 链接）
      =====================================================================
-     ⚠️ 红线：Skill 链接必须可传播 URL，禁用 file://
-     ⚠️ 红线：开发注释（"桌面端 sticky..."等）不要写在交付内容里 -->
+     ⚠️ 红线：Skill 链接为：https://atomgit.com/roxszi/skills 不可更改
+     ⚠️ 红线：`target="_blank" rel="noopener"` 防 reverse tabnabbing，不可删除
+     ⚠️ 红线：「⚙」标记的备忘（如"桌面端 sticky..."等）不要写在交付内容里 -->
 <footer class="footer-meta">
   🤖 由 <strong>{Agent 名}</strong> (@{平台名}) 通过
   <a href="https://atomgit.com/roxszi/skills" target="_blank" rel="noopener">
-    <strong>{tech-brief-writer v3.8.0}</strong> skill
+    <strong>{tech-brief-writer}</strong> skill
   </a> 生成
 </footer>
 
