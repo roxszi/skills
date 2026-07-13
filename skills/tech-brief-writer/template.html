@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{技术名}演示 — 工程化骨架（template.html v3.7.0）</title>
+<title>{技术名}演示 — 工程化骨架（template.html v3.8.0）</title>
 
-<!-- ⚙ 工程化交互演示骨架（template.html）· tech-brief-writer skill v3.7.0
+<!-- ⚙ 工程化交互演示骨架（template.html）· tech-brief-writer skill v3.8.0
      复制本文件 → 重命名为「交互演示.html」→ 替换所有 {占位符}
      ⚙ 复制后请删除所有「⚙」标记的开发注释（顶部 + sidebar 备忘）
-     完整规范见 SKILL.md §二「工程化样式框架」与「反模式 A/B/C」 -->
+     完整规范见 SKILL.md §二「工程化样式框架」与「反模式 A/B/C」
+-->
 
 <style>
   /* =====================================================================
@@ -16,10 +17,11 @@
      =====================================================================
      架构：.demo-header > .demo-app > (.demo-controls + .demo-main) + footer
      复用：整段拷贝到新 HTML 的 <style> 块，class 名不要改
-     ⚠️ CSS 只支持  注释，不要写 // 行注释（会被浏览器忽略整段）
+     ⚠️ CSS 只支持 /* */ 注释，不要写 // 行注释（会被浏览器忽略整段）
      ===================================================================== */
 
-  /* 基础排版 */
+  /* 基础排版
+     overscroll-behavior: contain 防止页面滚动传播到子滚动容器（sidebar） */
   body {
     font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC",
                  "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
@@ -28,10 +30,12 @@
     background: #f5f7fa;
     color: #222;
     line-height: 1.5;
+    overscroll-behavior: contain;
   }
 
   /* ── 1. Sticky 顶部标题区 ────────────────────────────────────────────
-     滚动时吸顶可见；与 body 同色避免内容穿透；底部蓝边框区分标题与正文 */
+     滚动时吸顶可见；与 body 同色避免内容穿透；底部蓝边框区分标题与正文
+     z-index: 100 确保覆盖 sidebar（sidebar sticky 时在 header 下方） */
   .demo-header {
     position: sticky;
     top: 0;
@@ -66,17 +70,21 @@
     .demo-app { grid-template-columns: 1fr; }
   }
 
-  /* ── 3. 左侧参数侧栏（sticky） ────────────────────────────────────── */
+  /* ── 3. 左侧参数侧栏（sticky） ──────────────────────────────────────
+     top: 80px  — 避开 sticky header（header 高度约 60-70px + 16px gap）
+     max-height: calc(100vh - 96px) — 80px top + 16px 底部留白
+     overscroll-behavior: contain — 防止 sidebar 滚动传播到 main */
   .demo-controls {
     background: white;
     padding: 16px;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
     position: sticky;
-    top: 16px;        /* 桌面端：滑块固定在视口顶部 */
+    top: 80px;        /* 桌面端：滑块固定在 header 下方，不被遮挡 */
     align-self: start;
-    max-height: calc(100vh - 32px);
+    max-height: calc(100vh - 96px);
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
   @media (max-width: 768px) {
     .demo-controls {
@@ -109,6 +117,7 @@
     font-weight: 600;
     color: #1565c0;
     font-size: 13px;
+    font-family: 'Consolas', monospace;
   }
   .demo-controls input[type=range] {
     width: 100%;
@@ -125,7 +134,9 @@
     gap: 16px;
   }
 
-  /* ── 5. 单个面板卡片 ───────────────────────────────────────────────── */
+  /* ── 5. 单个面板卡片 ─────────────────────────────────────────────────
+     .correct / .wrong 语义 class：教学场景区分"正确做法"与"错误做法"，标题着色
+     默认黑色（.demo-panel h3），.correct 绿色，.wrong 红色；业务层按需添加 */
   .demo-panel {
     background: white;
     padding: 16px;
@@ -137,6 +148,8 @@
     font-size: 15px;
     color: #333;
   }
+  .demo-panel.correct h3 { color: #2E7D32; }   /* 教学语义：正确做法 */
+  .demo-panel.wrong   h3 { color: #C62828; }   /* 教学语义：错误做法 */
 
   /* ── 6. canvas 响应式包装 ────────────────────────────────────────────
      aspect-ratio 替代 JS 算高度：浏览器原生 CSS-only
@@ -239,14 +252,15 @@
     <!-- ⚙ 反模式 C 教学示例：开发注释应放 HTML 注释里（用户看不见）
          复制本模板做新演示时，请删除此开发备忘块。
          判断标准：这段文字去掉后用户会不会困惑？不会 = 开发注释。
-         桌面端：滑块固定在左侧（.demo-controls sticky）
+         桌面端：滑块固定在左侧（.demo-controls sticky top:80px，避开 header）
          移动端：滑块在顶部（@media max-width: 768px → position: static） -->
   </aside>
 
   <!-- ─── 右侧主面板 ───────────────────────────────────────────────────── -->
   <main class="demo-main">
 
-    <!-- 面板 A：示例 1（高斯曲线，参数 1 控制中心位置） -->
+    <!-- 面板 A：示例 1（高斯曲线，参数 1 控制中心位置）
+         演示 withClip 用法：数据线用 withClip 包裹，防超出坐标轴 -->
     <div class="demo-panel">
       <h3>面板 A：{标题}</h3>
       <div class="demo-canvas-wrap">
@@ -261,7 +275,8 @@
       </div>
     </div>
 
-    <!-- 面板 B：示例 2（柱状图，参数 2 控制柱高，演示分类轴 noXTicks=true） -->
+    <!-- 面板 B：示例 2（柱状图，参数 2 控制柱高，演示分类轴 noXTicks=true）
+         教学语义示例：加 class="correct" 标题变绿，加 class="wrong" 标题变红 -->
     <div class="demo-panel">
       <h3>面板 B：{标题}</h3>
       <div class="demo-canvas-wrap">
@@ -281,7 +296,7 @@
 <footer class="footer-meta">
   🤖 由 <strong>{Agent 名}</strong> (@{平台名}) 通过
   <a href="https://atomgit.com/roxszi/skills" target="_blank" rel="noopener">
-    <strong>{tech-brief-writer v3.7.0}</strong> skill
+    <strong>{tech-brief-writer v3.8.0}</strong> skill
   </a> 生成
 </footer>
 
@@ -290,7 +305,7 @@
 // JS 框架（工具层 + 业务层）
 // =====================================================================
 // 架构（自下而上）：
-//   工具层    initCanvas / niceTicks / drawAxes   ← 不要改（业务无关）
+//   工具层    initCanvas / niceTicks / drawAxes / withClip / drawLine  ← 不要改（业务无关）
 //   业务层    CONFIG / 业务公式 / drawPanelX       ← 按演示主题替换
 //   入口层    updateAll + 事件绑定 + 初始化        ← 不要改（除非扩展滑块机制）
 // =====================================================================
@@ -315,7 +330,7 @@ const CONFIG = {
 
 
 // =====================================================================
-// 工具层：高 DPI canvas + 自适应刻度 + 坐标轴绘制
+// 工具层：高 DPI canvas + 自适应刻度 + 坐标轴绘制 + 裁剪
 // =====================================================================
 // 这些函数与业务无关，原样保留即可。修 bug 时优先看 SKILL.md §二反模式清单。
 
@@ -365,10 +380,11 @@ function niceTicks(xMin, xMax, targetCount) {
 }
 
 
-// 画坐标轴 + 网格 + 标签，返回坐标变换函数
+// 画坐标轴 + 网格 + 标签，返回坐标变换函数 + plotArea
 // 参数 noXTicks=true：跳过 X 网格竖线 + X 刻度文字（用于分类轴，如面板 B 的激光名）
+// 返回值含 plotArea 字段（{top,bottom,left,right} 聚合，供 withClip 使用）
 function drawAxes(ctx, dpr, w, h, xMin, xMax, yMin, yMax, xLabel, yLabel, yLog, noXTicks) {
-  const left = 60, right = w - 30, top = 30, bottom = h - 40;
+  const left = 60, right = w - 30, top = 30, bottom = h - 60;
 
   // 每次重绘前重置 transform（避免 DPR 累积放大）
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -454,7 +470,8 @@ function drawAxes(ctx, dpr, w, h, xMin, xMax, yMin, yMax, xLabel, yLabel, yLog, 
   ctx.fillText(yLabel, 0, 0);
   ctx.restore();
 
-  // 返回坐标变换函数（业务层绘图用）
+  // 返回坐标变换函数 + plotArea
+  // plotArea 用于 withClip：限制数据绘制在坐标轴内部，防止数据超出 X/Y 范围画到轴外
   return {
     xToPx: x => left + (x - xMin) / (xMax - xMin) * (right - left),
     yToPx: y => {
@@ -464,8 +481,66 @@ function drawAxes(ctx, dpr, w, h, xMin, xMax, yMin, yMax, xLabel, yLabel, yLog, 
       }
       return bottom - (y - yMin) / (yMax - yMin) * (bottom - top);
     },
-    top, bottom, left, right
+    top, bottom, left, right,
+    plotArea: { top, bottom, left, right }
   };
+}
+
+
+// withClip：在 plotArea 内执行绘图操作，超出部分被 Canvas 自动裁剪
+// 解决"数据超出坐标轴范围画到 Y 轴左侧"的通用缺陷
+// 用法：
+//   const { xToPx, yToPx, plotArea } = drawAxes(...);
+//   withClip(ctx, plotArea, () => {
+//     ctx.strokeStyle = "#1565c0";
+//     ctx.beginPath();
+//     for (...) { ctx.lineTo(xToPx(x), yToPx(y)); }
+//     ctx.stroke();
+//   });
+// 注意：坐标轴、刻度文字、标注应在 withClip 外调用（不应被裁剪）
+function withClip(ctx, plot, fn) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(plot.left, plot.top,
+           plot.right - plot.left, plot.bottom - plot.top);
+  ctx.clip();
+  try { fn(); } finally { ctx.restore(); }
+}
+
+
+// 通用折线绘制（使用 drawAxes 返回的 xToPx/yToPx）
+// 可选 plotArea 参数：传入则自动 withClip 包裹，防数据超出坐标轴
+// 用法：
+//   drawLine(ctx, xData, yData, xToPx, yToPx, opts);                    // 不 clip（向后兼容）
+//   drawLine(ctx, xData, yData, xToPx, yToPx, opts, plotArea);          // 自动 clip
+function drawLine(ctx, xData, yData, xToPx, yToPx, opts, plotArea) {
+  const draw = () => {
+    ctx.save();
+    ctx.globalAlpha = opts.alpha ?? 1;
+    ctx.strokeStyle = opts.color;
+    ctx.lineWidth = opts.lineWidth ?? 1;
+    ctx.beginPath();
+    let started = false;
+    for (let i = 0; i < xData.length; i++) {
+      const X = xToPx(xData[i]);
+      const Y = yToPx(yData[i]);
+      if (!started) { ctx.moveTo(X, Y); started = true; }
+      else ctx.lineTo(X, Y);
+    }
+    ctx.stroke();
+
+    if (opts.fillTo !== undefined) {
+      ctx.lineTo(xToPx(xData[xData.length - 1]), yToPx(opts.fillTo));
+      ctx.lineTo(xToPx(xData[0]), yToPx(opts.fillTo));
+      ctx.closePath();
+      ctx.fillStyle = opts.fillColor || opts.color;
+      ctx.globalAlpha = (opts.alpha ?? 1) * 0.18;
+      ctx.fill();
+    }
+    ctx.restore();
+  };
+  if (plotArea) withClip(ctx, plotArea, draw);
+  else draw();
 }
 
 
@@ -483,7 +558,7 @@ function gaussian(x, x0, width) {
 }
 
 
-// 面板 A：高斯曲线（param1 控制中心，演示线性 X 轴）
+// 面板 A：高斯曲线（param1 控制中心，演示线性 X 轴 + withClip 用法）
 function drawPanelA() {
   const param1 = parseFloat(document.getElementById("param1").value);
   document.getElementById("param1-val").textContent = param1;
@@ -492,23 +567,24 @@ function drawPanelA() {
   const w = canvasA._cssW, h = canvasA._cssH;
 
   // 坐标范围：X 0-100，Y 0-1.1
-  const { xToPx, yToPx, top, bottom } = drawAxes(
+  // drawAxes 返回 plotArea，供 withClip / drawLine 使用
+  const { xToPx, yToPx, top, bottom, plotArea } = drawAxes(
     ctx, canvasA._dpr, w, h, 0, 100, 0, 1.1,
     "自变量 X", "因变量 Y", false
   );
 
   // 高斯曲线（param1 = 中心位置；宽度固定 20）
-  ctx.strokeStyle = "#1565c0";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
+  // 用 drawLine 的 plotArea 参数自动 clip
+  //   即使 param1 接近 0 或 100（曲线尾部超出 X 范围），也不会画到坐标轴外
+  const xData = [], yData = [];
   for (let x = 0; x <= 100; x += 1) {
-    const y = gaussian(x, param1, 20);
-    if (x === 0) ctx.moveTo(xToPx(x), yToPx(y));
-    else ctx.lineTo(xToPx(x), yToPx(y));
+    xData.push(x);
+    yData.push(gaussian(x, param1, 20));
   }
-  ctx.stroke();
+  drawLine(ctx, xData, yData, xToPx, yToPx,
+    { color: "#1565c0", lineWidth: 3 }, plotArea);
 
-  // 当前中心位置垂直虚线
+  // 当前中心位置垂直虚线（不 clip，允许标注在 plotArea 顶部上方）
   ctx.strokeStyle = "#c62828";
   ctx.lineWidth = 2;
   ctx.setLineDash([5, 3]);
@@ -518,7 +594,7 @@ function drawPanelA() {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // 标注中心值
+  // 标注中心值（不 clip，文字在 plotArea 顶部上方）
   ctx.fillStyle = "#c62828";
   ctx.font = "italic 12px system-ui";
   ctx.textAlign = "center";
@@ -535,29 +611,38 @@ function drawPanelB() {
   const w = canvasB._cssW, h = canvasB._cssH;
 
   // 坐标范围：X 是分类轴（用 0-SERIES.length 占位），Y 0-3
-  const { xToPx, yToPx, top, bottom, left, right } = drawAxes(
+  const { xToPx, yToPx, top, bottom, left, right, plotArea } = drawAxes(
     ctx, canvasB._dpr, w, h, 0, CONFIG.SERIES.length, 0, 3,
     "分类轴（激光 / 样本 / 频率）", "数值（× param2）", false,
     true    // noXTicks=true：分类轴，跳过数字刻度，由本函数自己画类目名
   );
 
   // 柱子（按 CONFIG.SERIES 循环）
+  // 柱子用 fillRect，用 withClip 包裹防止柱顶超出 Y 轴上限时画到坐标轴外
   const barW = 0.5;
+  withClip(ctx, plotArea, () => {
+    CONFIG.SERIES.forEach((s, i) => {
+      const cx = i + 0.5;
+      const height = (s.value / 300) * param2;       // 占位公式，替换为实际计算
+      const py = yToPx(height);
+
+      ctx.fillStyle = s.color;
+      ctx.fillRect(xToPx(cx - barW / 2), py,
+                   xToPx(cx + barW / 2) - xToPx(cx - barW / 2), bottom - py);
+    });
+  });
+
+  // 类目名 + 数值标注（不 clip，文字在 X 轴下方 / 柱顶上方）
   CONFIG.SERIES.forEach((s, i) => {
     const cx = i + 0.5;
-    const height = (s.value / 300) * param2;       // 占位公式，替换为实际计算
+    const height = (s.value / 300) * param2;
     const py = yToPx(height);
 
-    ctx.fillStyle = s.color;
-    ctx.fillRect(xToPx(cx - barW / 2), py, xToPx(cx + barW / 2) - xToPx(cx - barW / 2), bottom - py);
-
-    // 类目名（X 轴下方）
     ctx.fillStyle = "#444";
     ctx.font = "12px system-ui";
     ctx.textAlign = "center";
     ctx.fillText(s.name, xToPx(cx), bottom + 18);
 
-    // 数值标注
     ctx.fillStyle = "#222";
     ctx.font = "bold 13px system-ui";
     ctx.fillText(height.toFixed(2), xToPx(cx), py - 8);

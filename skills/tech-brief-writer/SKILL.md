@@ -3,7 +3,7 @@ name: 技术简报撰写
 slug: tech-brief-writer
 description: 技术简报撰写。为某项技术/方法/仪器原理撰写"可存档技术简报"时使用。产出"MD 简报 + 可选交互式 HTML 演示"双件套。当用户说"写个技术简报""帮我把 XX 技术整理成备忘""看一下这篇文章用的技术并存档"等表述时触发。本 skill 定义了简报的目录规范、13 章节模板（含参考文献独立章节）、技术依赖处理规则、图/公式/算例要求、交互演示规格（6 class 工程化样式框架 + niceTicks 自适应刻度 + viewBox 留白）、诚实性红线与交付前自检清单。配套：`template.md`（MD 骨架）+ `template.html`（HTML 工程化骨架）双模板。
 author: RoxSzi (SI_Cheng-Yun, 司承运)
-version: 3.7.0
+version: 3.8.0
 license: MulanPSL v2
 ---
 
@@ -84,7 +84,7 @@ license: MulanPSL v2
 1. **一句话定义**：blockquote 引用块开篇（中文定义 + 英文全称/缩写 + 典型应用场景）
 2. **核心技术原理**
    - 问题背景（可用"传统方案 vs 局限"对比表引入痛点）
-   - ★ **一个统一核心洞察（single conceptual anchor）**：把整项技术的精髓凝练成**一张表或一句话**（例：SERDS 的"坐标对偶性"——谁不动谁被差分消掉；LTRS 的"梯度力 vs 散射力平衡"）。这是整篇的灵魂锚点，读者记住这一个就抓住了本质。
+   - ★ **一个统一核心洞察（single conceptual anchor）**：把整项技术的精髓凝练成**一张表或一句话**（例：SERDS 的"坐标对偶性"——谁不动谁被差分消掉；LTRS 的"双作用合一"——同一束光在焦点处同时实现捕获与拉曼探测）。这是整篇的灵魂锚点，读者记住这一个就抓住了本质。
 3. **原理示意图**：**§3.1 Mermaid（流程 / 因果图）** + **§3.2 外置 SVG（几何 / 谱图）**；二者互补、**禁止用 ASCII art 替代几何 / 谱图**
    - **§3.1 Mermaid**：算法步骤 / 数据流 / 因果链。Mermaid 语法踩坑清单见 §三·3.5
    - **§3.2 外置 SVG**：频谱位置、χ⁽³⁾ 谱形、信号路径、光路几何等几何 / 谱图类内容
@@ -226,7 +226,7 @@ const SCATTER_OFFSETS = Array.from({length: N},
 
 > **判据不互斥时**：若一项满足"必须"，按必须做；否则按"可省略"判断。**默认优先用 Mermaid + SVG**——只在 Mermaid 表达不清时升级到 HTML 演示。
 
-### 工程化样式框架（v3.7.0 新增）
+### 工程化样式框架
 
 > 完整代码骨架见本 skill 同目录的 [`template.html`](template.html)；本节仅沉淀**核心规则 + 反模式红线**，避免 SKILL.md 膨胀失控。手写新演示时按 §一 末尾「HTML 工程化骨架」callout 的工作流执行。
 
@@ -236,12 +236,12 @@ const SCATTER_OFFSETS = Array.from({length: N},
 |:---|:---|:---|
 | `.demo-header` | sticky 顶部标题区 | `position: sticky; top: 0`（滚动时吸顶） |
 | `.demo-app` | 主 Grid 布局 | `grid-template-columns: 260px 1fr` + `@media (max-width: 768px)` 切单列 |
-| `.demo-controls` | 左参数侧栏 | `position: sticky; top: 16px` + `max-height: calc(100vh - 32px)` |
+| `.demo-controls` | 左参数侧栏 | `position: sticky; top: 80px` + `max-height: calc(100vh - 96px)` + `overscroll-behavior: contain` |
 | `.demo-main` | 主面板容器 | `min-width: 0` 防 grid 子项溢出 |
 | `.demo-panel` | 单个面板卡片 | 白卡 + `box-shadow: 0 1px 3px rgba(0,0,0,0.08)` |
 | `.demo-canvas-wrap` | canvas 响应式包装 | `aspect-ratio: 16/7`（移动端 4/3） + canvas 绝对定位 `100%` |
 
-**辅助 class**：`.legend`（图例横条）、`.insight`（黄底关键推论框）、`.note`（公式注释）
+**辅助 class**：`.legend`（图例横条）、`.insight`（黄底关键推论框）、`.note`（公式注释）、`.demo-panel.correct` / `.demo-panel.wrong`（教学场景：正确/错误做法标题着色——绿 / 红）
 
 #### JS 工具集（template.html 已封装，直接抄）
 
@@ -249,6 +249,9 @@ const SCATTER_OFFSETS = Array.from({length: N},
 - **`niceTicks(xMin, xMax, targetCount)`** — 1/2/5×10ⁿ 自适应刻度，返回 `[{x, label}]`（label 含 `toFixed`，避免浮点尾巴）
 - **`ResizeObserver`** — 监听 `.demo-canvas-wrap`（**不是 canvas 本身**——canvas 绝对定位后自身 size 不变）
 - **`requestAnimationFrame(() => initCanvas(...))`** — canvas 绝对定位，初始 `clientWidth/Height` 可能为 0
+- **`drawAxes(...)`** — 画坐标轴 + 网格 + 标签，返回 `{xToPx, yToPx, top, bottom, left, right, plotArea}`（`plotArea` 字段供 withClip 使用）
+- **`withClip(ctx, plotArea, fn)`** — 在 plotArea 内执行绘图，超出部分 Canvas 自动裁剪（防数据画到坐标轴外）
+- **`drawLine(ctx, xData, yData, xToPx, yToPx, opts, plotArea?)`** — 可选 `plotArea` 参数，传入则自动 clip（向后兼容，不传则不 clip）
 
 #### 工程化要点（必做）
 
@@ -264,7 +267,7 @@ const SCATTER_OFFSETS = Array.from({length: N},
    <div class="footer-meta">
      🤖 由 <strong>Agent-X</strong> (@Platform) 通过 
      <a href="https://atomgit.com/roxszi/skills" target="_blank" rel="noopener">
-       <strong>tech-brief-writer v3.7.0</strong> skill
+       <strong>tech-brief-writer v3.8.0</strong> skill
      </a> 生成
    </div>
    ```
@@ -315,6 +318,21 @@ const aFrac = A / (A + B);                       // = 1/(1+D)，只依赖 D
 **正确做法**（二选一）：
 - 直接删除（最干净）
 - 保留为 HTML 注释：`<!-- 开发备忘：桌面端 sticky / 移动端切 static -->`
+
+##### 反模式 D：数据超出坐标轴未 clip
+
+**症状**：业务数据的 X/Y 范围超出坐标轴显示范围时，数据线画到坐标轴外（如 Y 轴左侧、X 轴下方），与刻度文字 / 轴标签重叠。
+
+**根因**：drawAxes 不自动 clip 数据绘制——业务层用 `ctx.lineTo(xToPx(x), yToPx(y))` 画线时，超出坐标轴范围的点会被画到 plotArea 外。
+
+**修复**（template.html 已实现）：
+- 方式 1：`drawLine(ctx, xData, yData, xToPx, yToPx, opts, plotArea)` — 传入 `plotArea` 参数（drawAxes 返回值），drawLine 自动 clip
+- 方式 2：`withClip(ctx, plotArea, () => { /* 手动画线 */ })` — 用 withClip 包裹自定义绘制代码
+
+**判断标准**：数据范围是否可能超出坐标轴显示范围？是 → 必须用 clip。常见场景：
+- 绝对波长 / 波数网格的数据范围 > 显示窗口（如 SERDS 中 wlAbs 788-1082 nm，X 轴只显示 810-1020 nm）
+- 对数坐标轴的数据跨越多个数量级
+- 归一化数据的尾部超出显示范围
 
 #### Agent 行为约束（工具优先级，强约束）
 
@@ -432,7 +450,7 @@ DOI / URL 给定
    - `dual-wavelength-spectrum.svg` 双波长光谱示意
    - `potential-well.svg` 势阱 / 势能面
    - `force-balance.svg` 受力分析
-6. **viewBox 留白 + 弹性显示**（v3.7.0 新增）：
+6. **viewBox 留白 + 弹性显示**：
    - **症状**：SVG 文字标注被 viewBox 边界裁切（如"简正坐标"四个字只显示一半）
    - **根因**：viewBox 宽度不够 + 文字位置（`x=` / `text-anchor=start`）超出右边界
    - **修复模板**：
@@ -630,6 +648,7 @@ Mermaid 解析器对节点标签、边标签、箭头语法有严格的保留字
 - [ ] **§二·HTML 实测**：本地浏览器打开后，**每个滑块/下拉/按钮**至少点 1 次；连续运行 ≥ 30 秒无崩溃；目视确认无画面异常（无累积放大、无坐标偏移）。
 - [ ] **§二·Canvas 散点反模式**：演示涉及散点时已用 Mulberry32 + 固定 SCATTER_OFFSETS（详见 §二 "Canvas 散点可视化反模式"）？
 - [ ] **§二·niceTicks 浮点尾巴**：坐标轴标签是否过 `toFixed(decimals)`？裸 `number[]` 已替换为 `[{x, label}]`？无 `2.0000000003` 这类长尾数字？
+- [ ] **§二·数据 clip**：业务数据范围是否可能超出坐标轴显示范围？是 → drawLine 已传 `plotArea` 参数或用 `withClip` 包裹？（详见 §二反模式 D）
 - [ ] **§二·物理公式简化陷阱**：占比 / 归一化公式的分子分母有没有共用项被约掉？拖每个滑块（含 ΔQ、λ_max、Γ 等）对应物理量都响应？**必须 node 模拟验证，不只靠 Review。**
 - [ ] **§二·开发注释 vs 交付内容**：sidebar / hint 区块无"💡 桌面端 sticky..."这类开发注释（已挪到 HTML 注释或删除）？`template.html` 顶部的「⚙」标记注释已删除？
 - [ ] **§二·Footer 模板**：含三要素（Agent 名 + 平台 + Skill 链接）？Skill 链接是**可传播 URL**（非 file://）？`target="_blank" rel="noopener"`？
@@ -649,9 +668,9 @@ Mermaid 解析器对节点标签、边标签、箭头语法有严格的保留字
 
 | 范式 | 代表性维度 | 新 Agent 应重点学什么 |
 |:---|:---|:---|
-| `LTRS/` | **复杂技术（多原理交叉）的范式** | 灵魂锚点的提炼方式（§2.2 四要素表）、技术变体章节（§5）、依赖地图（§13）的完整结构 |
+| `LTRS/` | **复杂技术（多原理交叉）的范式** | 灵魂锚点的提炼方式（§2.1 四要素表）、技术变体章节（§5）、依赖地图（§13）的完整结构 |
 | `SERDS/` | **单一物理机理的范式** | 一句话锚点（坐标对偶性表）、关键概念的简洁呈现、参考文献分类排列（§10） |
-| `template.html` | **交互演示工程化骨架** | 6 class 样式框架（`demo-*`）、CONFIG 集中区、niceTicks / drawAxes / ResizeObserver 全套工具、Footer 三要素 |
+| `template.html` | **交互演示工程化骨架** | 6 class 样式框架（`demo-*`）、CONFIG 集中区、niceTicks / drawAxes / withClip / drawLine 全套工具、.correct/.wrong 教学语义 class、Footer 三要素 |
 
 **使用建议**：
 

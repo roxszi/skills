@@ -4,166 +4,502 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SERDS 坐标对偶性演示</title>
+
 <style>
-  /* ===== 全局样式 ===== */
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  /* =====================================================================
+     CSS 框架（6 class 命名空间：demo-*）· tech-brief-writer skill v3.8.0
+     ===================================================================== */
+
   body {
-    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
-    background: #f5f5f5;
-    color: #333;
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC",
+                 "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
+    margin: 0;
     padding: 16px;
-  }
-  h1 {
-    text-align: center;
-    font-size: 1.4em;
-    margin-bottom: 4px;
-  }
-  .subtitle {
-    text-align: center;
-    font-size: 0.85em;
-    color: #666;
-    margin-bottom: 16px;
+    background: #f5f7fa;
+    color: #222;
+    line-height: 1.5;
+    overscroll-behavior: contain;
   }
 
-  /* ===== 控制面板 ===== */
-  .controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
-    justify-content: center;
-    align-items: flex-end;
-    background: #fff;
-    padding: 16px 24px;
-    border-radius: 8px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  /* ── 1. Sticky 顶部标题区 ──────────────────────────────────────────── */
+  .demo-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #f5f7fa;
+    padding: 12px 0 8px 0;
     margin-bottom: 16px;
+    border-bottom: 2px solid #1565c0;
   }
-  .ctrl-group {
+  .demo-header h1 {
+    font-size: 22px;
+    color: #1565c0;
+    margin: 0;
+  }
+  .demo-header .subtitle {
+    font-size: 13px;
+    color: #666;
+    margin: 4px 0 0 0;
+  }
+
+  /* ── 2. 主 Grid 布局 ───────────────────────────────────────────────── */
+  .demo-app {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 16px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  @media (max-width: 768px) {
+    .demo-app { grid-template-columns: 1fr; }
+  }
+
+  /* ── 3. 左侧参数侧栏（sticky） ────────────────────────────────────── */
+  .demo-controls {
+    background: white;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    position: sticky;
+    top: 80px;
+    align-self: start;
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  @media (max-width: 768px) {
+    .demo-controls {
+      position: static;
+      max-height: none;
+    }
+  }
+  .demo-controls h3 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1565c0;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 8px;
+  }
+  .demo-controls .control {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    min-width: 140px;
+    margin-bottom: 14px;
   }
-  .ctrl-group label {
-    font-size: 0.78em;
+  .demo-controls .control label {
+    font-size: 12px;
     color: #555;
-    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
   }
-  .ctrl-group label .val {
-    color: #1565C0;
+  .demo-controls .control label .val {
+    font-weight: 600;
+    color: #1565c0;
+    font-size: 13px;
     font-family: 'Consolas', monospace;
   }
-  input[type="range"] {
+  .demo-controls input[type=range] {
     width: 100%;
-    height: 6px;
-    -webkit-appearance: none;
-    background: #e0e0e0;
-    border-radius: 3px;
-    outline: none;
-  }
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #1565C0;
     cursor: pointer;
-    border: 2px solid #fff;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-  }
-  input[type="range"]::-moz-range-thumb {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #1565C0;
-    cursor: pointer;
-    border: 2px solid #fff;
+    margin: 0;
   }
 
-  /* ===== 四面板网格 ===== */
-  .panel-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    max-width: 1200px;
-    margin: 0 auto;
+  /* ── 4. 主面板容器 ─────────────────────────────────────────────────── */
+  .demo-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
   }
-  .panel {
-    background: #fff;
+
+  /* ── 5. 单个面板卡片 ───────────────────────────────────────────────── */
+  .demo-panel {
+    background: white;
+    padding: 16px;
     border-radius: 8px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   }
-  .panel-title {
-    font-size: 0.82em;
-    font-weight: 700;
-    padding: 8px 12px 4px;
-    line-height: 1.3;
+  .demo-panel h3 {
+    margin: 0 0 8px 0;
+    font-size: 15px;
+    color: #333;
   }
-  .panel.correct .panel-title { color: #2E7D32; }
-  .panel.wrong .panel-title { color: #C62828; }
-  canvas {
-    display: block;
+  .demo-panel.correct h3 { color: #2E7D32; }
+  .demo-panel.wrong   h3 { color: #C62828; }
+
+  /* ── 6. canvas 响应式包装 ──────────────────────────────────────────── */
+  .demo-canvas-wrap {
+    position: relative;
     width: 100%;
-    height: 280px;
+    aspect-ratio: 16 / 7;
+    background: #fafafa;
+    border-radius: 4px;
   }
+  @media (max-width: 768px) {
+    .demo-canvas-wrap { aspect-ratio: 4 / 3; }
+  }
+  .demo-canvas-wrap canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  /* ── 辅助 class ────────────────────────────────────────────────────── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: #555;
+  }
+  .legend .dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  .insight {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: #fff9c4;
+    border-left: 3px solid #fbc02d;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #5d4037;
+  }
+  .note {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #777;
+    font-style: italic;
+  }
+
+  /* ── Footer 三要素 ─────────────────────────────────────────────────── */
+  .footer-meta {
+    margin-top: 24px;
+    padding: 14px 0;
+    border-top: 1px solid #e0e0e0;
+    text-align: center;
+    font-size: 12px;
+    color: #777;
+  }
+  .footer-meta a {
+    color: #1565c0;
+    text-decoration: none;
+  }
+  .footer-meta a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
 
-<h1>SERDS 坐标对偶性交互演示</h1>
-<p class="subtitle">双波长交替激发 — 调节参数实时观察"谁动谁不动"</p>
+<header class="demo-header">
+  <h1>SERDS 坐标对偶性演示</h1>
+  <div class="subtitle">双波长交替激发 — 调节参数实时观察"谁动谁不动"</div>
+</header>
 
-<!-- ===== 参数控制 ===== -->
-<div class="controls">
-  <div class="ctrl-group">
-    <label>Δλ (激发波长差): <span class="val" id="dlambda-val">0.5</span> nm</label>
-    <input type="range" id="dlambda" min="0.1" max="2.0" step="0.1" value="0.5">
-  </div>
-  <div class="ctrl-group">
-    <label>荧光强度: <span class="val" id="flamp-val">180</span></label>
-    <input type="range" id="flamp" min="0" max="400" step="10" value="180">
-  </div>
-  <div class="ctrl-group">
-    <label>荧光中心: <span class="val" id="flcenter-val">11500</span> cm⁻¹</label>
-    <input type="range" id="flcenter" min="10000" max="12500" step="100" value="11500">
-  </div>
-  <div class="ctrl-group">
-    <label>荧光宽度: <span class="val" id="flsigma-val">1000</span> cm⁻¹</label>
-    <input type="range" id="flsigma" min="300" max="2000" step="50" value="1000">
-  </div>
-  <div class="ctrl-group">
-    <label>噪声水平: <span class="val" id="noise-val">0.15</span></label>
-    <input type="range" id="noise" min="0" max="1.0" step="0.05" value="0.15">
-  </div>
+<div class="demo-app">
+
+  <!-- ─── 左侧参数侧栏 ─────────────────────────────────────────────────── -->
+  <aside class="demo-controls">
+    <h3>参数控制</h3>
+
+    <div class="control">
+      <label>Δλ (激发波长差) <span class="val" id="dlambda-val">0.5</span> nm</label>
+      <input type="range" id="dlambda" min="0.1" max="2.0" step="0.1" value="0.5">
+    </div>
+
+    <div class="control">
+      <label>荧光强度 <span class="val" id="flamp-val">180</span></label>
+      <input type="range" id="flamp" min="0" max="400" step="10" value="180">
+    </div>
+
+    <div class="control">
+      <label>荧光中心 <span class="val" id="flcenter-val">11500</span> cm⁻¹</label>
+      <input type="range" id="flcenter" min="10000" max="12500" step="100" value="11500">
+    </div>
+
+    <div class="control">
+      <label>荧光宽度 <span class="val" id="flsigma-val">1000</span> cm⁻¹</label>
+      <input type="range" id="flsigma" min="300" max="2000" step="50" value="1000">
+    </div>
+
+    <div class="control">
+      <label>噪声水平 <span class="val" id="noise-val">0.15</span></label>
+      <input type="range" id="noise" min="0" max="1.0" step="0.05" value="0.15">
+    </div>
+
+    <div class="insight">
+      💡 关键观察：调大 Δλ 看 (c) 与 (d) 拉曼残留幅值变化；调高荧光强度看 (c) 几乎不受影响而 (d) 出现"伪拉曼峰"。
+    </div>
+  </aside>
+
+  <!-- ─── 右侧主面板 ─────────────────────────────────────────────────── -->
+  <main class="demo-main">
+
+      <div class="demo-panel">
+        <h3>(a) 绝对波长坐标 — 拉曼移、荧光不动</h3>
+        <div class="demo-canvas-wrap"><canvas id="canvas-a"></canvas></div>
+        <div class="legend">
+          <span><span class="dot" style="background:#1565c0"></span>λ₁ 激发谱</span>
+          <span><span class="dot" style="background:#c62828"></span>λ₂ 激发谱</span>
+          <span><span class="dot" style="background:#4caf50"></span>荧光背景（Kasha）</span>
+        </div>
+      </div>
+
+      <div class="demo-panel">
+        <h3>(b) Raman shift 坐标 — 拉曼不动、荧光移</h3>
+        <div class="demo-canvas-wrap"><canvas id="canvas-b"></canvas></div>
+        <div class="legend">
+          <span><span class="dot" style="background:#1565c0"></span>λ₁ 激发谱</span>
+          <span><span class="dot" style="background:#c62828"></span>λ₂ 激发谱</span>
+          <span><span class="dot" style="background:#2e7d32"></span>荧光漂移 ≈ ΔνP</span>
+        </div>
+      </div>
+
+      <div class="demo-panel correct">
+        <h3>(c) 绝对坐标差分 → 拉曼残留 ✅ 正确做法</h3>
+        <div class="demo-canvas-wrap"><canvas id="canvas-c"></canvas></div>
+        <div class="note">差分前两谱共享绝对波数网格，荧光严格对消，残留 = 拉曼差分信号（Δλ 越大残留越强）。</div>
+      </div>
+
+      <div class="demo-panel wrong">
+        <h3>(d) Raman shift 差分 → 荧光残留 ❌ 错误做法</h3>
+        <div class="demo-canvas-wrap"><canvas id="canvas-d"></canvas></div>
+        <div class="note">RS 坐标下荧光峰已错位 ΔνP，差分后留下"伪拉曼峰"，可能误判为拉曼信号。</div>
+      </div>
+
+  </main>
 </div>
 
-<!-- ===== 四面板画布 ===== -->
-<div class="panel-grid">
-  <div class="panel">
-    <div class="panel-title">(a) 绝对波长坐标 — 拉曼移、荧光不动</div>
-    <canvas id="canvas-a"></canvas>
-  </div>
-  <div class="panel">
-    <div class="panel-title">(b) Raman shift 坐标 — 拉曼不动、荧光移</div>
-    <canvas id="canvas-b"></canvas>
-  </div>
-  <div class="panel correct">
-    <div class="panel-title">(c) 绝对坐标差分 → 拉曼残留 ✅（正确做法）</div>
-    <canvas id="canvas-c"></canvas>
-  </div>
-  <div class="panel wrong">
-    <div class="panel-title">(d) Raman shift 差分 → 荧光残留 ❌（错误做法）</div>
-    <canvas id="canvas-d"></canvas>
-  </div>
-</div>
+<footer class="footer-meta">
+  🤖 由 <strong>化学智能体 - CherryClaw</strong> (@CherryStudio) 通过
+  <a href="https://atomgit.com/roxszi/skills" target="_blank" rel="noopener">
+    <strong>tech-brief-writer v3.8.0</strong> skill
+  </a> 生成
+</footer>
 
 <script>
 'use strict';
 
-// ============================================================
-// 1. 物理参数与状态
-// ============================================================
+// =====================================================================
+// CONFIG: 业务常量集中区
+// =====================================================================
+const CONFIG = {
+  // 滑块元信息：id / STATE 键 / 格式化函数
+  SLIDERS: [
+    { id: 'dlambda',  key: 'deltaLambda', fmt: v => v.toFixed(1) },
+    { id: 'flamp',    key: 'flAmp',       fmt: v => v.toFixed(0) },
+    { id: 'flcenter', key: 'flCenter',    fmt: v => v.toFixed(0) },
+    { id: 'flsigma',  key: 'flSigma',     fmt: v => v.toFixed(0) },
+    { id: 'noise',    key: 'noise',       fmt: v => v.toFixed(2) },
+  ],
+
+  // canvas id 清单（用于 ResizeObserver 绑定）
+  CANVAS_IDS: ['canvas-a', 'canvas-b', 'canvas-c', 'canvas-d'],
+};
+
+
+// =====================================================================
+// 工具层：高 DPI canvas + 自适应刻度 + 坐标轴绘制
+// =====================================================================
+
+// 高 DPI canvas 初始化（CSS 控制显示尺寸，物理像素 = css × dpr）
+function initCanvas(canvas) {
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth;
+  const cssH = canvas.clientHeight;
+  if (cssW === 0 || cssH === 0) return;
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  canvas._ctx = canvas.getContext("2d");
+  canvas._dpr = dpr;
+  canvas._cssW = cssW;
+  canvas._cssH = cssH;
+}
+
+
+// niceTicks：1/2/5×10ⁿ 自适应步长 + 整数计数 + toFixed 规避浮点尾巴
+function niceTicks(xMin, xMax, targetCount) {
+  const range = xMax - xMin;
+  if (range <= 0) return [];
+  const roughStep = range / Math.max(1, targetCount);
+  const magLog = Math.floor(Math.log10(roughStep));
+  const norm   = roughStep / Math.pow(10, magLog);
+  let niceNorm;
+  if      (norm < 1.5) niceNorm = 1;
+  else if (norm < 3)   niceNorm = 2;
+  else if (norm < 7)   niceNorm = 5;
+  else                 niceNorm = 10;
+  const mag = Math.pow(10, magLog);
+  const decimals = Math.max(0, -magLog);
+  const ticks = [];
+  const startN = Math.ceil(xMin / (niceNorm * mag));
+  const endN   = Math.floor(xMax / (niceNorm * mag));
+  for (let ni = startN; ni <= endN; ni++) {
+    const x = ni * niceNorm * mag;
+    ticks.push({ x: x, label: x.toFixed(decimals) });
+  }
+  return ticks;
+}
+
+
+// 画坐标轴 + 网格 + 标签，返回坐标变换函数
+function drawAxes(ctx, dpr, w, h, xMin, xMax, yMin, yMax, xLabel, yLabel, yLog, noXTicks) {
+  const left = 60, right = w - 30, top = 30, bottom = h - 60;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  // 网格
+  ctx.strokeStyle = "#f0f0f0";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  if (!noXTicks) {
+    const xGridTicks = niceTicks(xMin, xMax, Math.max(3, Math.floor((right - left) / 50)));
+    xGridTicks.forEach(t => {
+      const px = left + (t.x - xMin) / (xMax - xMin) * (right - left);
+      ctx.moveTo(px, top);
+      ctx.lineTo(px, bottom);
+    });
+  }
+  if (yLog) {
+    const logMin = Math.log10(yMin);
+    const logMax = Math.log10(yMax);
+    for (let logY = Math.ceil(logMin); logY <= logMax; logY++) {
+      const py = bottom - (logY - logMin) / (logMax - logMin) * (bottom - top);
+      ctx.moveTo(left, py);
+      ctx.lineTo(right, py);
+    }
+  } else {
+    const yTicks = niceTicks(yMin, yMax, 5);
+    yTicks.forEach(t => {
+      const py = bottom - (t.x - yMin) / (yMax - yMin) * (bottom - top);
+      ctx.moveTo(left, py);
+      ctx.lineTo(right, py);
+    });
+  }
+  ctx.stroke();
+
+  // 主坐标轴
+  ctx.strokeStyle = "#333";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(left, top);
+  ctx.lineTo(left, bottom);
+  ctx.lineTo(right, bottom);
+  ctx.stroke();
+
+  // X 刻度文字
+  if (!noXTicks) {
+    ctx.fillStyle = "#444";
+    ctx.font = "11px system-ui";
+    ctx.textAlign = "center";
+    const xTicks = niceTicks(xMin, xMax, Math.max(3, Math.floor((right - left) / 50)));
+    xTicks.forEach(t => {
+      const px = left + (t.x - xMin) / (xMax - xMin) * (right - left);
+      ctx.fillText(t.label, px, bottom + 15);
+    });
+  }
+
+  // Y 刻度文字
+  ctx.textAlign = "right";
+  if (yLog) {
+    const logMin = Math.log10(yMin);
+    const logMax = Math.log10(yMax);
+    for (let logY = Math.ceil(logMin); logY <= logMax; logY++) {
+      const py = bottom - (logY - logMin) / (logMax - logMin) * (bottom - top);
+      ctx.fillText("10^" + logY, left - 5, py + 4);
+    }
+  } else {
+    const yTicks = niceTicks(yMin, yMax, 5);
+    yTicks.forEach(t => {
+      const py = bottom - (t.x - yMin) / (yMax - yMin) * (bottom - top);
+      ctx.fillText(t.label, left - 5, py + 4);
+    });
+  }
+
+  // 轴标签
+  ctx.font = "13px system-ui";
+  ctx.fillStyle = "#333";
+  ctx.textAlign = "center";
+  ctx.fillText(xLabel, (left + right) / 2, h - 5);
+  ctx.save();
+  ctx.translate(15, (top + bottom) / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = "center";
+  ctx.fillText(yLabel, 0, 0);
+  ctx.restore();
+
+  return {
+    xToPx: x => left + (x - xMin) / (xMax - xMin) * (right - left),
+    yToPx: y => {
+      if (yLog) {
+        return bottom - (Math.log10(Math.max(y, yMin)) - Math.log10(yMin)) /
+               (Math.log10(yMax) - Math.log10(yMin)) * (bottom - top);
+      }
+      return bottom - (y - yMin) / (yMax - yMin) * (bottom - top);
+    },
+    top, bottom, left, right,
+    plotArea: { top, bottom, left, right }
+  };
+}
+
+
+// withClip：在 plotArea 内执行绘图，超出部分被 Canvas 自动裁剪
+// 解决"数据超出坐标轴范围画到 Y 轴左侧"的通用缺陷
+function withClip(ctx, plot, fn) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(plot.left, plot.top,
+           plot.right - plot.left, plot.bottom - plot.top);
+  ctx.clip();
+  try { fn(); } finally { ctx.restore(); }
+}
+
+
+// 通用折线绘制（使用 drawAxes 返回的 xToPx/yToPx）
+// 可选 plotArea 参数：传入则自动 clip，防数据超出坐标轴
+function drawLine(ctx, xData, yData, xToPx, yToPx, opts, plotArea) {
+  const draw = () => {
+    ctx.save();
+    ctx.globalAlpha = opts.alpha ?? 1;
+    ctx.strokeStyle = opts.color;
+    ctx.lineWidth = opts.lineWidth ?? 1;
+    ctx.beginPath();
+    let started = false;
+    for (let i = 0; i < xData.length; i++) {
+      const X = xToPx(xData[i]);
+      const Y = yToPx(yData[i]);
+      if (!started) { ctx.moveTo(X, Y); started = true; }
+      else ctx.lineTo(X, Y);
+    }
+    ctx.stroke();
+
+    if (opts.fillTo !== undefined) {
+      ctx.lineTo(xToPx(xData[xData.length - 1]), yToPx(opts.fillTo));
+      ctx.lineTo(xToPx(xData[0]), yToPx(opts.fillTo));
+      ctx.closePath();
+      ctx.fillStyle = opts.fillColor || opts.color;
+      ctx.globalAlpha = (opts.alpha ?? 1) * 0.18;
+      ctx.fill();
+    }
+    ctx.restore();
+  };
+  if (plotArea) withClip(ctx, plotArea, draw);
+  else draw();
+}
+
+
+// =====================================================================
+// 业务层：物理参数 / 公式 / 数据生成 / 面板渲染
+// =====================================================================
+
 const STATE = {
   lambda_P1: 785.0,       // 激发波长 1 (nm)
   deltaLambda: 0.5,       // 波长差 (nm)
@@ -179,22 +515,18 @@ const STATE = {
   ],
 };
 
-// ============================================================
-// 2. 物理函数
-// ============================================================
-
-/** 洛伦兹峰 */
+// 洛伦兹峰
 function lorentzian(x, x0, amp, fwhm) {
   const g = fwhm / 2;
-  return amp * g * g / ((x - x0) ** 2 + g * g);
+  return amp * g * g / ((x - x0) * (x - x0) + g * g);
 }
 
-/** 高斯函数 */
+// 高斯函数
 function gaussian(x, x0, amp, sigma) {
   return amp * Math.exp(-0.5 * ((x - x0) / sigma) ** 2);
 }
 
-/** 获取派生量 */
+// 获取派生量：lp1/lp2/nuP1/nuP2/deltaNuP
 function getDerived() {
   const lp1 = STATE.lambda_P1;
   const lp2 = lp1 + STATE.deltaLambda;
@@ -204,11 +536,7 @@ function getDerived() {
   return { lp1, lp2, nuP1, nuP2, deltaNuP };
 }
 
-/**
- * 在绝对波数网格上构建拉曼信号
- * @param {number[]} nuGrid - 绝对波数数组
- * @param {number} nuP - 激发光绝对波数
- */
+// 在绝对波数网格上构建拉曼信号
 function buildRaman(nuGrid, nuP) {
   const spec = new Float32Array(nuGrid.length);
   for (const p of STATE.ramanPeaks) {
@@ -219,7 +547,7 @@ function buildRaman(nuGrid, nuP) {
   return spec;
 }
 
-/** 在绝对波数网格上构建荧光背景 (Kasha 规则: 绝对波数不变) */
+// 在绝对波数网格上构建荧光背景（Kasha 规则：绝对波数不变）
 function buildFluorescence(nuGrid) {
   const spec = new Float32Array(nuGrid.length);
   for (let i = 0; i < nuGrid.length; i++) {
@@ -228,12 +556,11 @@ function buildFluorescence(nuGrid) {
   return spec;
 }
 
-/** 生成高斯白噪声数组 */
+// Box-Muller 高斯白噪声
 function makeNoise(n, sigma) {
   const arr = new Float32Array(n);
   if (sigma === 0) return arr;
   for (let i = 0; i < n; i++) {
-    // Box-Muller 变换
     const u1 = Math.random() + 1e-12;
     const u2 = Math.random();
     arr[i] = sigma * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
@@ -241,9 +568,27 @@ function makeNoise(n, sigma) {
   return arr;
 }
 
-// ============================================================
-// 3. 数据生成（每次参数改变时调用）
-// ============================================================
+// 线性插值：从 (nuSrc, valSrc) 插值到 rsGrid（RS 坐标）
+function interpToRS(nuSrc, valSrc, nuP, rsGrid) {
+  const n = rsGrid.length;
+  const out = new Float32Array(n);
+  const ns = nuSrc.length;
+  for (let i = 0; i < n; i++) {
+    const targetNu = nuP - rsGrid[i];
+    let lo = 0, hi = ns - 1;
+    if (targetNu <= nuSrc[0]) { out[i] = valSrc[0]; continue; }
+    if (targetNu >= nuSrc[ns - 1]) { out[i] = valSrc[ns - 1]; continue; }
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (nuSrc[mid] < targetNu) lo = mid; else hi = mid;
+    }
+    const t = (targetNu - nuSrc[lo]) / (nuSrc[hi] - nuSrc[lo]);
+    out[i] = valSrc[lo] + t * (valSrc[hi] - valSrc[lo]);
+  }
+  return out;
+}
+
+// 数据生成（每次参数改变时调用）
 let DATA = null;
 
 function computeData() {
@@ -278,7 +623,7 @@ function computeData() {
     S2abs[i] = R2[i] + F[i] + noise2[i];
   }
 
-  // 差分 (绝对坐标)
+  // 差分（绝对坐标）
   const diffAbs = new Float32Array(N);
   for (let i = 0; i < N; i++) diffAbs[i] = S1abs[i] - S2abs[i];
 
@@ -290,7 +635,7 @@ function computeData() {
     rsGrid[i] = rsMin + (rsMax - rsMin) * i / (Nrs - 1);
   }
 
-  // 插值到 RS 坐标 (nu_abs = nuP - rs)
+  // 插值到 RS 坐标
   const S1rs = interpToRS(nuAbs, S1abs, nuP1, rsGrid);
   const S2rs = interpToRS(nuAbs, S2abs, nuP2, rsGrid);
   const diffRS = new Float32Array(Nrs);
@@ -300,186 +645,24 @@ function computeData() {
     nuAbs, wlAbs, S1abs, S2abs, diffAbs, F,
     rsGrid, S1rs, S2rs, diffRS,
     lp1, lp2, nuP1, nuP2, deltaNuP,
+    flCenter: STATE.flCenter,
   };
 }
 
-/** 线性插值: 从 (nuSrc, valSrc) 插值到 rsGrid (RS 坐标) */
-function interpToRS(nuSrc, valSrc, nuP, rsGrid) {
-  const n = rsGrid.length;
-  const out = new Float32Array(n);
-  const ns = nuSrc.length;
-  for (let i = 0; i < n; i++) {
-    const targetNu = nuP - rsGrid[i]; // 对应的绝对波数
-    // 二分查找
-    let lo = 0, hi = ns - 1;
-    if (targetNu <= nuSrc[0]) { out[i] = valSrc[0]; continue; }
-    if (targetNu >= nuSrc[ns - 1]) { out[i] = valSrc[ns - 1]; continue; }
-    while (hi - lo > 1) {
-      const mid = (lo + hi) >> 1;
-      if (nuSrc[mid] < targetNu) lo = mid; else hi = mid;
-    }
-    const t = (targetNu - nuSrc[lo]) / (nuSrc[hi] - nuSrc[lo]);
-    out[i] = valSrc[lo] + t * (valSrc[hi] - valSrc[lo]);
-  }
-  return out;
-}
 
-// ============================================================
-// 4. Canvas 绘图工具
-// ============================================================
+// =====================================================================
+// 四面板渲染
+// =====================================================================
 
-/** 高 DPI Canvas 初始化 */
-function setupCanvas(canvas) {
-  const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  return { ctx, w: rect.width, h: rect.height };
-}
-
-/**
- * 通用折线绘制
- * @param {ctx} ctx - Canvas 2D context
- * @param {number[]} xData - X 数据
- * @param {number[]} yData - Y 数据
- * @param {object} opts - {color, lineWidth, alpha, fillTo}
- */
-function drawLine(ctx, xData, yData, xMin, xMax, yMin, yMax, plotW, plotH, opts) {
-  const margin = opts.margin || { l: 50, r: 12, t: 12, b: 32 };
-  const px = (x) => margin.l + (x - xMin) / (xMax - xMin) * (plotW - margin.l - margin.r);
-  const py = (y) => plotH - margin.b - (y - yMin) / (yMax - yMin) * (plotH - margin.t - margin.b);
-
-  ctx.save();
-  ctx.globalAlpha = opts.alpha ?? 1;
-  ctx.strokeStyle = opts.color;
-  ctx.lineWidth = opts.lineWidth ?? 1;
-  ctx.beginPath();
-  let started = false;
-  for (let i = 0; i < xData.length; i++) {
-    const X = px(xData[i]);
-    const Y = py(yData[i]);
-    if (!started) { ctx.moveTo(X, Y); started = true; }
-    else ctx.lineTo(X, Y);
-  }
-  ctx.stroke();
-
-  // 填充区域（可选）
-  if (opts.fillTo !== undefined) {
-    ctx.lineTo(px(xData[xData.length - 1]), py(opts.fillTo));
-    ctx.lineTo(px(xData[0]), py(opts.fillTo));
-    ctx.closePath();
-    ctx.fillStyle = opts.fillColor || opts.color;
-    ctx.globalAlpha = (opts.alpha ?? 1) * 0.08;
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-/**
- * 绘制坐标轴 + 网格 + 标签
- */
-function drawAxes(ctx, xMin, xMax, yMin, yMax, plotW, plotH, xLabel, yLabel, opts = {}) {
-  const margin = opts.margin || { l: 50, r: 12, t: 12, b: 32 };
-  const px = (x) => margin.l + (x - xMin) / (xMax - xMin) * (plotW - margin.l - margin.r);
-  const py = (y) => plotH - margin.b - (y - yMin) / (yMax - yMin) * (plotH - margin.t - margin.b);
-
-  ctx.save();
-  ctx.font = '10px Consolas, monospace';
-  ctx.fillStyle = '#888';
-
-  // 网格线 (X)
-  const xTicks = opts.xTicks || 5;
-  for (let i = 0; i <= xTicks; i++) {
-    const xVal = xMin + (xMax - xMin) * i / xTicks;
-    const X = px(xVal);
-    ctx.strokeStyle = '#eee';
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    ctx.moveTo(X, margin.t);
-    ctx.lineTo(X, plotH - margin.b);
-    ctx.stroke();
-    // 刻度标签
-    ctx.textAlign = 'center';
-    ctx.fillText(xVal.toFixed(opts.xDecimals ?? 0), X, plotH - margin.b + 14);
-  }
-
-  // 网格线 (Y)
-  const yTicks = opts.yTicks || 4;
-  for (let i = 0; i <= yTicks; i++) {
-    const yVal = yMin + (yMax - yMin) * i / yTicks;
-    const Y = py(yVal);
-    ctx.strokeStyle = '#eee';
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    ctx.moveTo(margin.l, Y);
-    ctx.lineTo(plotW - margin.r, Y);
-    ctx.stroke();
-    ctx.textAlign = 'right';
-    ctx.fillText(yVal.toFixed(opts.yDecimals ?? 0), margin.l - 4, Y + 3);
-  }
-
-  // 零线
-  if (yMin < 0 && yMax > 0) {
-    const Y0 = py(0);
-    ctx.strokeStyle = '#ccc';
-    ctx.lineWidth = 0.8;
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath();
-    ctx.moveTo(margin.l, Y0);
-    ctx.lineTo(plotW - margin.r, Y0);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  // 轴标签
-  ctx.fillStyle = '#555';
-  ctx.font = '11px Segoe UI, Microsoft YaHei, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(xLabel, (margin.l + plotW - margin.r) / 2, plotH - 2);
-  ctx.save();
-  ctx.translate(12, (margin.t + plotH - margin.b) / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText(yLabel, 0, 0);
-  ctx.restore();
-  ctx.restore();
-}
-
-/** 绘制图例 */
-function drawLegend(ctx, items, plotW, plotH) {
-  ctx.save();
-  ctx.font = '10px Segoe UI, sans-serif';
-  let yOff = 16;
-  for (const item of items) {
-    ctx.fillStyle = item.color;
-    ctx.fillRect(plotW - 100, yOff - 7, 14, 3);
-    ctx.fillStyle = '#555';
-    ctx.textAlign = 'left';
-    ctx.fillText(item.label, plotW - 82, yOff - 2);
-    yOff += 14;
-  }
-  ctx.restore();
-}
-
-// ============================================================
-// 5. 四面板绘制
-// ============================================================
-
-function drawAll() {
-  drawPanelA();
-  drawPanelB();
-  drawPanelC();
-  drawPanelD();
-}
-
-/** (a) 绝对波长坐标 */
+// (a) 绝对波长坐标
 function drawPanelA() {
   const canvas = document.getElementById('canvas-a');
-  const { ctx, w, h } = setupCanvas(canvas);
-  const { wlAbs, S1abs, S2abs, F, lp1, lp2 } = DATA;
+  initCanvas(canvas);
+  if (!canvas._ctx) return;
+  const ctx = canvas._ctx;
+  const w = canvas._cssW, h = canvas._cssH;
+  const { wlAbs, S1abs, S2abs, F } = DATA;
 
-  // Y 范围
   let yMax = 0;
   for (let i = 0; i < S1abs.length; i++) {
     if (S1abs[i] > yMax) yMax = S1abs[i];
@@ -487,30 +670,32 @@ function drawPanelA() {
   }
   yMax = Math.ceil(yMax / 50) * 50;
 
-  drawAxes(ctx, 810, 1020, 0, yMax, w, h,
-    '绝对散射波长 (nm)', '强度 (a.u.)', { xDecimals: 0, yDecimals: 0 });
+  const { xToPx, yToPx, plotArea } = drawAxes(
+    ctx, canvas._dpr, w, h,
+    810, 1020, 0, yMax,
+    '绝对散射波长 (nm)', '强度 (a.u.)', false
+  );
 
-  // 荧光填充
-  drawLine(ctx, wlAbs, F, 810, 1020, 0, yMax, w, h,
-    { color: '#4CAF50', lineWidth: 1, alpha: 0.3, fillTo: 0, fillColor: '#4CAF50' });
+  // 荧光背景填充（clip 防数据超出坐标轴）
+  drawLine(ctx, wlAbs, F, xToPx, yToPx,
+    { color: '#4CAF50', lineWidth: 1, alpha: 0.5, fillTo: 0, fillColor: '#4CAF50' }, plotArea);
 
-  // 两谱
-  drawLine(ctx, wlAbs, S1abs, 810, 1020, 0, yMax, w, h,
-    { color: '#1565C0', lineWidth: 1.2, alpha: 0.8 });
-  drawLine(ctx, wlAbs, S2abs, 810, 1020, 0, yMax, w, h,
-    { color: '#C62828', lineWidth: 1.2, alpha: 0.8 });
-
-  drawLegend(ctx, [
-    { color: '#1565C0', label: `λ₁=${lp1} nm` },
-    { color: '#C62828', label: `λ₂=${lp2} nm` },
-  ], w, h);
+  // 两激发谱（clip 防数据超出坐标轴）
+  drawLine(ctx, wlAbs, S1abs, xToPx, yToPx,
+    { color: '#1565C0', lineWidth: 1.2, alpha: 0.8 }, plotArea);
+  drawLine(ctx, wlAbs, S2abs, xToPx, yToPx,
+    { color: '#C62828', lineWidth: 1.2, alpha: 0.8 }, plotArea);
 }
 
-/** (b) Raman shift 坐标 */
+
+// (b) Raman shift 坐标
 function drawPanelB() {
   const canvas = document.getElementById('canvas-b');
-  const { ctx, w, h } = setupCanvas(canvas);
-  const { rsGrid, S1rs, S2rs, nuP1, nuP2, flCenter } = DATA;
+  initCanvas(canvas);
+  if (!canvas._ctx) return;
+  const ctx = canvas._ctx;
+  const w = canvas._cssW, h = canvas._cssH;
+  const { rsGrid, S1rs, S2rs, nuP1, nuP2, flCenter, deltaNuP } = DATA;
 
   let yMax = 0;
   for (let i = 0; i < S1rs.length; i++) {
@@ -519,59 +704,61 @@ function drawPanelB() {
   }
   yMax = Math.ceil(yMax / 50) * 50;
 
-  drawAxes(ctx, 150, 3200, 0, yMax, w, h,
-    '拉曼位移 (cm⁻¹)', '强度 (a.u.)', { xDecimals: 0, yDecimals: 0 });
+  const { xToPx, yToPx } = drawAxes(
+    ctx, canvas._dpr, w, h,
+    150, 3200, 0, yMax,
+    '拉曼位移 (cm⁻¹)', '强度 (a.u.)', false
+  );
 
-  // 标注荧光漂移
+  // 荧光漂移箭头
   const flRS1 = nuP1 - flCenter;
   const flRS2 = nuP2 - flCenter;
-  const py = (y) => h - 32 - (y - 0) / (yMax - 0) * (h - 12 - 32);
-  const px = (x) => 50 + (x - 150) / (3200 - 150) * (w - 12 - 50);
+  const arrowY = yToPx(yMax * 0.55);
 
   ctx.save();
-  ctx.strokeStyle = '#4CAF50';
+  ctx.strokeStyle = '#2E7D32';
+  ctx.fillStyle = '#2E7D32';
   ctx.lineWidth = 1.5;
-  const arrowY = py(yMax * 0.55);
   ctx.beginPath();
-  ctx.moveTo(px(flRS1), arrowY);
-  ctx.lineTo(px(flRS2), arrowY);
+  ctx.moveTo(xToPx(flRS1), arrowY);
+  ctx.lineTo(xToPx(flRS2), arrowY);
   ctx.stroke();
-  // 箭头
+
+  // 双向箭头头部
   const ah = 4;
   ctx.beginPath();
-  ctx.moveTo(px(flRS1), arrowY);
-  ctx.lineTo(px(flRS1) + ah, arrowY - ah);
-  ctx.lineTo(px(flRS1) + ah, arrowY + ah);
+  ctx.moveTo(xToPx(flRS1), arrowY);
+  ctx.lineTo(xToPx(flRS1) + ah, arrowY - ah);
+  ctx.lineTo(xToPx(flRS1) + ah, arrowY + ah);
   ctx.fill();
   ctx.beginPath();
-  ctx.moveTo(px(flRS2), arrowY);
-  ctx.lineTo(px(flRS2) - ah, arrowY - ah);
-  ctx.lineTo(px(flRS2) - ah, arrowY + ah);
+  ctx.moveTo(xToPx(flRS2), arrowY);
+  ctx.lineTo(xToPx(flRS2) - ah, arrowY - ah);
+  ctx.lineTo(xToPx(flRS2) - ah, arrowY + ah);
   ctx.fill();
 
-  ctx.fillStyle = '#2E7D32';
-  ctx.font = '9px Segoe UI, sans-serif';
+  ctx.font = '11px system-ui';
   ctx.textAlign = 'center';
-  ctx.fillText(`荧光漂移 ≈ ${DATA.deltaNuP.toFixed(1)} cm⁻¹`, (px(flRS1) + px(flRS2)) / 2, arrowY - 6);
+  ctx.fillText('荧光漂移 ≈ ' + deltaNuP.toFixed(1) + ' cm⁻¹',
+    (xToPx(flRS1) + xToPx(flRS2)) / 2, arrowY - 6);
   ctx.restore();
 
-  // 两谱
-  drawLine(ctx, rsGrid, S1rs, 150, 3200, 0, yMax, w, h,
+  // 两激发谱
+  drawLine(ctx, rsGrid, S1rs, xToPx, yToPx,
     { color: '#1565C0', lineWidth: 1.2, alpha: 0.8 });
-  drawLine(ctx, rsGrid, S2rs, 150, 3200, 0, yMax, w, h,
+  drawLine(ctx, rsGrid, S2rs, xToPx, yToPx,
     { color: '#C62828', lineWidth: 1.2, alpha: 0.8 });
-
-  drawLegend(ctx, [
-    { color: '#1565C0', label: `λ₁=${DATA.lp1} nm` },
-    { color: '#C62828', label: `λ₂=${DATA.lp2} nm` },
-  ], w, h);
 }
 
-/** (c) 绝对坐标差分 */
+
+// (c) 绝对坐标差分（正确做法）
 function drawPanelC() {
   const canvas = document.getElementById('canvas-c');
-  const { ctx, w, h } = setupCanvas(canvas);
-  const { wlAbs, diffAbs } = DATA;
+  initCanvas(canvas);
+  if (!canvas._ctx) return;
+  const ctx = canvas._ctx;
+  const w = canvas._cssW, h = canvas._cssH;
+  const { wlAbs, diffAbs, nuP1 } = DATA;
 
   let yMax = 0, yMin = 0;
   for (let i = 0; i < diffAbs.length; i++) {
@@ -581,41 +768,61 @@ function drawPanelC() {
   yMax = Math.ceil(yMax / 5) * 5 + 2;
   yMin = Math.floor(yMin / 5) * 5 - 2;
 
-  drawAxes(ctx, 810, 1020, yMin, yMax, w, h,
-    '绝对散射波长 (nm)', 'ΔS (a.u.)', { xDecimals: 0, yDecimals: 1, yDecimals: 0 });
+  const { xToPx, yToPx, top, bottom, left, right, plotArea } = drawAxes(
+    ctx, canvas._dpr, w, h,
+    810, 1020, yMin, yMax,
+    '绝对散射波长 (nm)', 'ΔS (a.u.)', false
+  );
 
-  drawLine(ctx, wlAbs, diffAbs, 810, 1020, yMin, yMax, w, h,
-    { color: '#6A1B9A', lineWidth: 0.8 });
+  // 零线（差分信号必备）
+  if (yMin < 0 && yMax > 0) {
+    ctx.save();
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 0.8;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(left, yToPx(0));
+    ctx.lineTo(right, yToPx(0));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
 
-  // 标注拉曼峰位置
-  const margin = { l: 50, r: 12, t: 12, b: 32 };
-  const px = (x) => margin.l + (x - 810) / (1020 - 810) * (w - margin.l - margin.r);
+  // 差分信号（clip 防数据超出坐标轴）
+  drawLine(ctx, wlAbs, diffAbs, xToPx, yToPx,
+    { color: '#6A1B9A', lineWidth: 0.8 }, plotArea);
+
+  // 标注拉曼峰位置（绝对波长）
   ctx.save();
-  ctx.font = '8px Consolas, monospace';
+  ctx.font = '10px Consolas, monospace';
   ctx.fillStyle = '#6A1B9A';
-  ctx.globalAlpha = 0.4;
+  ctx.globalAlpha = 0.5;
   for (const p of STATE.ramanPeaks) {
-    const peakWl = 1e7 / (DATA.nuP1 - p.shift);
+    const peakWl = 1e7 / (nuP1 - p.shift);
     if (peakWl > 810 && peakWl < 1020) {
       ctx.strokeStyle = '#6A1B9A';
       ctx.lineWidth = 0.5;
       ctx.setLineDash([2, 2]);
       ctx.beginPath();
-      ctx.moveTo(px(peakWl), margin.t);
-      ctx.lineTo(px(peakWl), h - margin.b);
+      ctx.moveTo(xToPx(peakWl), top);
+      ctx.lineTo(xToPx(peakWl), bottom);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.textAlign = 'center';
-      ctx.fillText(`${p.shift}`, px(peakWl), h - margin.b - 2);
+      ctx.fillText(String(p.shift), xToPx(peakWl), bottom - 2);
     }
   }
   ctx.restore();
 }
 
-/** (d) Raman shift 差分 */
+
+// (d) Raman shift 差分（错误做法）
 function drawPanelD() {
   const canvas = document.getElementById('canvas-d');
-  const { ctx, w, h } = setupCanvas(canvas);
+  initCanvas(canvas);
+  if (!canvas._ctx) return;
+  const ctx = canvas._ctx;
+  const w = canvas._cssW, h = canvas._cssH;
   const { rsGrid, diffRS } = DATA;
 
   let yMax = 0, yMin = 0;
@@ -626,66 +833,97 @@ function drawPanelD() {
   yMax = Math.ceil(yMax / 5) * 5 + 2;
   yMin = Math.floor(yMin / 5) * 5 - 2;
 
-  drawAxes(ctx, 150, 3200, yMin, yMax, w, h,
-    '拉曼位移 (cm⁻¹)', 'ΔS (a.u.)', { xDecimals: 0, yDecimals: 0 });
+  const { xToPx, yToPx, top, bottom, left, right } = drawAxes(
+    ctx, canvas._dpr, w, h,
+    150, 3200, yMin, yMax,
+    '拉曼位移 (cm⁻¹)', 'ΔS (a.u.)', false
+  );
 
-  drawLine(ctx, rsGrid, diffRS, 150, 3200, yMin, yMax, w, h,
+  // 零线
+  if (yMin < 0 && yMax > 0) {
+    ctx.save();
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 0.8;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(left, yToPx(0));
+    ctx.lineTo(right, yToPx(0));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  // 差分信号
+  drawLine(ctx, rsGrid, diffRS, xToPx, yToPx,
     { color: '#E65100', lineWidth: 0.8 });
 
   // 标注原拉曼峰位置（应该已消失）
-  const margin = { l: 50, r: 12, t: 12, b: 32 };
-  const px = (x) => margin.l + (x - 150) / (3200 - 150) * (w - margin.l - margin.r);
   ctx.save();
-  ctx.font = '8px Consolas, monospace';
-  ctx.globalAlpha = 0.2;
+  ctx.globalAlpha = 0.25;
+  ctx.strokeStyle = '#C62828';
+  ctx.lineWidth = 0.5;
+  ctx.setLineDash([2, 2]);
   for (const p of STATE.ramanPeaks) {
-    ctx.strokeStyle = '#C62828';
-    ctx.lineWidth = 0.5;
-    ctx.setLineDash([2, 2]);
     ctx.beginPath();
-    ctx.moveTo(px(p.shift), margin.t);
-    ctx.lineTo(px(p.shift), h - margin.b);
+    ctx.moveTo(xToPx(p.shift), top);
+    ctx.lineTo(xToPx(p.shift), bottom);
     ctx.stroke();
-    ctx.setLineDash([]);
   }
+  ctx.setLineDash([]);
   ctx.restore();
 }
 
-// ============================================================
-// 6. 事件绑定
-// ============================================================
 
-const sliders = [
-  { id: 'dlambda',  key: 'deltaLambda', fmt: (v) => v.toFixed(1) },
-  { id: 'flamp',    key: 'flAmp',       fmt: (v) => v.toFixed(0) },
-  { id: 'flcenter', key: 'flCenter',    fmt: (v) => v.toFixed(0) },
-  { id: 'flsigma',  key: 'flSigma',     fmt: (v) => v.toFixed(0) },
-  { id: 'noise',    key: 'noise',       fmt: (v) => v.toFixed(2) },
-];
+function drawAll() {
+  drawPanelA();
+  drawPanelB();
+  drawPanelC();
+  drawPanelD();
+}
 
-for (const s of sliders) {
+
+// =====================================================================
+// 入口层
+// =====================================================================
+
+function onParamsChange() {
+  computeData();
+  drawAll();
+}
+
+function onResize() {
+  if (DATA) drawAll();
+}
+
+function setupResizeObserver() {
+  if (typeof ResizeObserver === 'undefined') {
+    window.addEventListener('resize', onResize);
+    return;
+  }
+  const ro = new ResizeObserver(onResize);
+  CONFIG.CANVAS_IDS.forEach(id => {
+    const c = document.getElementById(id);
+    if (c) ro.observe(c.parentElement);
+  });
+}
+
+// 滑块事件绑定
+CONFIG.SLIDERS.forEach(s => {
   const el = document.getElementById(s.id);
   const valEl = document.getElementById(s.id + '-val');
   el.addEventListener('input', () => {
     STATE[s.key] = parseFloat(el.value);
     valEl.textContent = s.fmt(STATE[s.key]);
-    computeData();
-    drawAll();
+    onParamsChange();
   });
-}
-
-// 窗口缩放重绘
-let resizeTimer = null;
-window.addEventListener('resize', () => {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => drawAll(), 150);
 });
 
-// ============================================================
-// 7. 初始化
-// ============================================================
-computeData();
-drawAll();
+// 等一帧确保布局完成
+requestAnimationFrame(() => {
+  onParamsChange();
+  setupResizeObserver();
+});
 </script>
+
 </body>
 </html>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 280"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 280"
      font-family="system-ui, -apple-system, 'Segoe UI', 'PingFang SC', sans-serif">
   <title>LTRS 经典光路示意图</title>
   <desc>激光器 → 扩束镜 → 二向色镜 → 高 NA 物镜 → 紧聚焦到细胞 → 背向拉曼散射 → Notch 滤波 → 光谱仪</desc>

@@ -14,7 +14,7 @@
 |---|---|---|---|
 | `skills/local-kb/` | 本地信息资源数据库 | 1.5.2 | bun |
 | `skills/ocr-toolkit/` | OCR 工具箱 | 1.0.2 | python |
-| `skills/tech-brief-writer/` | 技术简报撰写 | 3.7.0 | — |
+| `skills/tech-brief-writer/` | 技术简报撰写 | 3.8.0 | — |
 <!-- END: SKILLS-OVERVIEW -->
 
 主仓库：[AtomGit](https://atomgit.com/roxszi/skills)（作者国内主用）
