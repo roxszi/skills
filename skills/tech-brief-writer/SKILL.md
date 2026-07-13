@@ -1,43 +1,32 @@
 ---
 name: 技术简报撰写
 slug: tech-brief-writer
-description: 技术简报撰写。为某项技术/方法/仪器原理撰写"可存档技术简报"时使用。产出"MD 简报 + 可选交互式 HTML 演示"双件套。当用户说"写个技术简报""帮我把 XX 技术整理成备忘""看一下这篇文章用的技术并存档"等表述时触发。本 skill 定义了简报的目录规范、13 章节模板（含参考文献独立章节）、技术依赖处理规则、图/公式/算例要求、交互演示规格、诚实性红线与交付前自检清单。
+description: 技术简报撰写。为某项技术/方法/仪器原理撰写"可存档技术简报"时使用。产出"MD 简报 + 可选交互式 HTML 演示"双件套。当用户说"写个技术简报""帮我把 XX 技术整理成备忘""看一下这篇文章用的技术并存档"等表述时触发。本 skill 定义了简报的目录规范、13 章节模板（含参考文献独立章节）、技术依赖处理规则、图/公式/算例要求、交互演示规格（6 class 工程化样式框架 + niceTicks 自适应刻度 + viewBox 留白）、诚实性红线与交付前自检清单。配套：`template.md`（MD 骨架）+ `template.html`（HTML 工程化骨架）双模板。
 author: RoxSzi (SI_Cheng-Yun, 司承运)
-version: 3.6.0
+version: 3.7.0
 license: MulanPSL v2
 ---
 
 # 技术简报撰写 skill（tech-brief-writer）
 
-### 何时用
+### 触发条件
 
-用户要求为某项**技术/方法/仪器原理**撰写可长期存档的技术简报 / 备忘。**跨学科适用**——分析化学、物理化学、光谱学、化学计量学、生物、材料、半导体等任意技术领域均可。典型触发：
+**何时用**：用户要求为某项技术/方法/仪器原理撰写**可长期存档**的技术简报 / 备忘。**跨学科适用**——分析化学、物理化学、光谱学、化学计量学、生物、材料、半导体等任意技术领域均可。典型触发：
 
 - "帮我写一个 XX 技术的技术简报，我存下来备忘"
 - "看一下这篇文章用的技术，整理成档案"
 - "把 XX 方法的原理 + 公式 + 应用整理一份 md"
 
-### 何时不用
+**何时不用**：
 
-下列场景**不要**调用本 skill（避免误用）：
+- 临时问"这是什么"，不要求存档 → 直接回答
+- 内容不是技术（情感 / 生活 / 新闻 / 聊天）→ 改用其它 skill
+- 文献综述 / 论文草稿而非技术备忘 → 改用论文写作 skill
+- 单点问答（如"XX 试剂用什么浓度"）→ 直接回答
 
-- 用户只是临时问"这是什么"，不要求存档 → 直接回答即可，不存档
-- 用户要写的内容不是技术（如情感、生活、新闻、聊天） → 改用其它 skill 或不调
-- 内容是文献综述 / 论文草稿而非技术备忘 → 改用论文写作 skill
-- 内容是单点问答（如"XX 试剂用什么浓度"） → 直接回答，不存档
+> ⚠️ **涉及基础依赖技术时**：撰写前先判断是否属于"主体 + 依赖"复合技术（如 EC-SERS 主体 + 拉曼基础依赖）；若是，参见 §三·3.4 的技术依赖处理规则，避免教学法漂移（pedagogical drift）。
 
-> ⚠️ **涉及基础依赖技术时的特别提示**：撰写前先判断是否属于"主体 + 依赖"复合技术（如 EC-SERS 主体 + 拉曼基础依赖）；若是，参见 §三·3.4 的技术依赖处理规则，避免教学法漂移（pedagogical drift）。
-
-### 硬边界声明（独立 skill 的设计原则）
-
-本 skill 明确**不绑死**以下内容，交给宿主环境决定：
-
-- **具体学科领域**——任何技术领域都能用，§四 触发清单是跨学科通用骨架
-- **具体技术栈**——DOI 抓取 / 浏览器自动化 / 编程语言等一律用"父级词汇"，具体工具按宿主实际选用
-- **个人偏好**——表达风格、语言习惯、配套工具链等不沉淀进 skill
-- **宿主业务**——教学场景、特定课题栈、OCR、私有文献库等不写进 skill
-
-**这套边界是有意为之**——独立 skill 应能交付给任何宿主，而不是某个具体宿主的私有扩展。
+> 🧱 **硬边界（独立 skill 设计原则）**：本 skill 不绑死 ① 具体学科领域（跨学科通用）、② 具体技术栈（DOI 抓取 / 浏览器自动化 / 编程语言等用"父级词汇"）、③ 个人偏好（表达风格 / 语言习惯 / 配套工具链）、④ 宿主业务（教学场景 / 课题栈 / OCR / 私有文献库）。这套边界**有意为之**——独立 skill 应能交付给任何宿主。
 
 ### 目录规范
 
@@ -90,11 +79,7 @@ license: MulanPSL v2
 
 > 📌 **章节模板 vs 配套细化规范**：本章是"每节里要写什么"的硬性要求骨架；具体写作格式（公式、参考文献、SVG、依赖处理）单列为第三大节的细化规范，避免与本章互相重复。改规范只动对应章节。
 >
-> 📌 **依赖地图必填**：本模板第 13 章（依赖地图）是有跨章节生效的依赖类技术的硬性产物，详见 §三·3.4。
-> 
-> 📌 **formatter 元数据必填**：markdown 顶部的 yaml formatter 元数据（文档性质 / 最后修订日期 / 作者 / 发起人 / 其它有必要写在文档头的内容）。
-> 
-> 📌 **目录必填**：位置在 markdown 标题之下，§1 之上。
+> 📌 **三项必填**（除章节内容外）：① markdown 顶部 **yaml formatter**（文档性质 / 最后修订日期 / 作者 / 发起人）；② 标题之下、§1 之上的**目录**；③ 末尾第 13 章**依赖地图**（详见 §三·3.4）。
 
 1. **一句话定义**：blockquote 引用块开篇（中文定义 + 英文全称/缩写 + 典型应用场景）
 2. **核心技术原理**
@@ -135,6 +120,15 @@ license: MulanPSL v2
 > 3. 按需裁剪可选章节（目录 / 技术变体 §5 / 记忆口诀 §11 等）
 > 4. 完成后走 §五 自检清单
 
+> 💡 **HTML 工程化骨架（template）**：本 skill 同目录下的 [`template.html`](template.html) 提供 6 class 样式框架（`demo-*`）+ JS 工具集（`initCanvas` / `niceTicks` / `drawAxes` / `ResizeObserver`）+ CONFIG 集中区 + Footer 三要素，可作为新演示的起点。
+> 
+> **推荐工作流**：
+> 1. 复制 `template.html` → 重命名为 `交互演示.html`
+> 2. 替换所有 `{占位符}`（技术名 / Agent 名 / 业务公式 / CONFIG 数据）
+> 3. **删除所有「⚙」标记的开发注释**（顶部 + sidebar 备忘）
+> 4. 按 §二「工程化样式框架」+「反模式 A/B/C」对照执行
+> 5. 完成后走 §五 自检清单
+
 ---
 
 ## 二、演示（交互式 HTML）规格
@@ -148,9 +142,7 @@ license: MulanPSL v2
 - **单文件自包含**：HTML + JS + `<canvas>`，**离线双击可开**
 - **技术栈**：JS/TS 优先，ESM 风格；若涉及张量 / ML 再考虑 tfjs（浏览器端）
 - **中文页面**：标题、轴标签、图例全部中文
-- **高 DPI 适配**：读 `window.devicePixelRatio`，canvas 物理像素 = CSS 尺寸 × dpr
-  - ⚠️ **ImageData 索引必须用整数（imgData.width / imgData.height），不能用浮点 plotW / plotH**。否则会产生 小数索引，被自动 `Math.floor` 后落到错误像素的 A 通道，导致热图/位图大面积失色。
-  - `canvas.width/height/style.width/height` 任何时候都不在重绘函数里赋值。违反 = 物理像素累积爆炸。
+- **高 DPI 适配**：见下方「高 DPI Canvas 适配」节
 - **参数滑块实时重算重绘**：
   - 简单交互（默认）：`input` 事件 → 重新 `computeData()` → `drawAll()`，vanilla JS 即可，**零依赖**
   - 较复杂交互响应（多 view、组件化、跨滑块共享状态）：**VUE3 渐进式引入** —— 以 CDN 单文件形式挂载，**不要**走 `npm + Vite/webpack`：
@@ -169,52 +161,31 @@ license: MulanPSL v2
   - 循环动画（CV 扫描）**越来越快**（`requestAnimationFrame` 累积未取消）
   - 切换下拉时**canvas 残留**（清屏时未用 dpr 重置坐标系）
 
-### 高 DPI Canvas 模板
+### 高 DPI Canvas 适配
 
-```js
-// 初始化（页面加载时一次性执行）
-function initCanvas(canvas) {
-  const dpr = window.devicePixelRatio || 1;
-  const cssW = canvas.clientWidth || canvas.width;  // CSS 像素
-  const cssH = canvas.clientHeight || canvas.height;
-  canvas.width  = cssW * dpr;   // 物理像素：只设这一次
-  canvas.height = cssH * dpr;
-  canvas.style.width  = cssW + "px";
-  canvas.style.height = cssH + "px";
-  canvas._ctx = canvas.getContext("2d");
-  canvas._dpr = dpr;
-  canvas._cssW = cssW; canvas._cssH = cssH;
-}
-// 重绘（每次更新调用）
-function redraw(canvas) {
-  const { _ctx: ctx, _dpr: dpr, _cssW: w, _cssH: h } = canvas;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);   // 只重置坐标系
-  ctx.clearRect(0, 0, w, h);
-  // ... 绘图
-}
-```
+DPR 适配的完整 `initCanvas` + 重绘模板已封装在 [`template.html`](template.html)（**直接抄，不要重写**）。
+
+关键原则：
+- **CSS 控制显示尺寸**（`.demo-canvas-wrap` 的 `aspect-ratio`），**JS 只设物理像素**（`canvas.width = cssW × dpr`）
+- **不要在重绘函数里赋值 `canvas.width/height/style.width/style.height`** → 物理像素累积爆炸
+- **`ctx.setTransform(dpr, 0, 0, dpr, 0, 0)` 每次重绘前重置** → 避免累积缩放
+- **ImageData 索引用整数**（`imgData.width`），不要用浮点 `plotW` → 否则小数索引被 `Math.floor` 落到错误像素的 A 通道，热图 / 位图大面积失色
 
 ### Canvas 散点可视化反模式（必读）
 
 演示中大量场景需要画散点（标定曲线、重复测量、PCA 投影等）。**绝对避免的反模式**：
 
-#### 反模式：用 `Math.random()` 给散点的位置生成随机偏移
+#### ❌ 反模式：`Math.random()` 给散点位置生成随机偏移
 
 ```js
-// ❌ 错误：每次重绘都重新随机化
-for (let i = 0; i < N; i++) {
-  const x = baseX + (Math.random() - 0.5) * 2;  // 每次都不同
-  const y = baseY + (Math.random() - 0.5) * 2;
-  draw(x, y);
-}
+// 每次重绘 Math.random() 重新随机化 → 用户拖噪声滑块时散点整体漂移，看不到宽度变化
+const x = baseX + (Math.random() - 0.5) * 2;
 ```
 
-**现象**：用户拖动噪声滑块时画面"看起来完全不同的散点"——实际是变化了，但散点位置整体漂移，看不到宽度变化。
-
-#### 正确做法：Mulberry32 seeded PRNG + 固定 SCATTER_OFFSETS
+#### ✅ 修复：Mulberry32 seeded PRNG + 模块级预生成 SCATTER_OFFSETS
 
 ```js
-// Mulberry32 PRNG
+// Mulberry32 PRNG（固定 seed，可重现）
 function mulberry32(seed) {
   return function () {
     seed = (seed + 0x6D2B79F5) | 0;
@@ -224,26 +195,14 @@ function mulberry32(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-
-// 模块级预生成固定偏移（页面加载时一次性）
-const SCATTER_OFFSETS = (() => {
-  const rng = mulberry32(20260711);  // 任意固定 seed
-  const arr = [];
-  for (let i = 0; i < N; i++) arr.push((rng() - 0.5) * range);
-  return arr;
-})();
-
-// 重绘时：c 偏移用 SCATTER_OFFSETS（位置稳定），噪声用确定性方向 × 当前 noiseSigma
-for (let i = 0; i < N; i++) {
-  const noiseDir = (i % 2 === 0 ? 1 : -1) * ((i * 0.37) % 1 - 0.5) * 2;
-  const noiseSample = noiseDir * state.noiseSigma;  // 来自滑块
-  const c = baseConc + SCATTER_OFFSETS[i];           // 位置稳定
-  const A = slope * c + noiseSample;                  // Y 散布随噪声变化
-  draw(c, A);
-}
+// 页面加载时一次性预生成固定偏移（不在重绘里调用 Math.random）
+const SCATTER_OFFSETS = Array.from({length: N},
+  () => (mulberry32(SEED)() - 0.5) * range);
 ```
 
-**验证方法**：调噪声滑块时，散点的 **X 轴位置不变**，只 **Y 轴散布宽度变化**。两者都变 = SCATTER_OFFSETS 没生效或被覆盖。
+**重绘原则**：位置用 `SCATTER_OFFSETS[i]`（稳定），噪声幅度用确定性方向 × 当前 `noiseSigma`（来自滑块）。
+
+**验证方法**：调噪声滑块时，散点的 **X 轴位置不变**，只 **Y 轴散布宽度变化**。两者都变 = `SCATTER_OFFSETS` 没生效或被覆盖。
 
 #### 配套可视化（强烈推荐）
 
@@ -266,6 +225,113 @@ for (let i = 0; i < N; i++) {
 - 核心机理涉及多参数协同（如 §4 例子中"捕获 vs 激发功率 trade-off"）
 
 > **判据不互斥时**：若一项满足"必须"，按必须做；否则按"可省略"判断。**默认优先用 Mermaid + SVG**——只在 Mermaid 表达不清时升级到 HTML 演示。
+
+### 工程化样式框架（v3.7.0 新增）
+
+> 完整代码骨架见本 skill 同目录的 [`template.html`](template.html)；本节仅沉淀**核心规则 + 反模式红线**，避免 SKILL.md 膨胀失控。手写新演示时按 §一 末尾「HTML 工程化骨架」callout 的工作流执行。
+
+#### 6 class 命名空间（直接复用，不改名）
+
+| Class | 作用 | 关键属性 |
+|:---|:---|:---|
+| `.demo-header` | sticky 顶部标题区 | `position: sticky; top: 0`（滚动时吸顶） |
+| `.demo-app` | 主 Grid 布局 | `grid-template-columns: 260px 1fr` + `@media (max-width: 768px)` 切单列 |
+| `.demo-controls` | 左参数侧栏 | `position: sticky; top: 16px` + `max-height: calc(100vh - 32px)` |
+| `.demo-main` | 主面板容器 | `min-width: 0` 防 grid 子项溢出 |
+| `.demo-panel` | 单个面板卡片 | 白卡 + `box-shadow: 0 1px 3px rgba(0,0,0,0.08)` |
+| `.demo-canvas-wrap` | canvas 响应式包装 | `aspect-ratio: 16/7`（移动端 4/3） + canvas 绝对定位 `100%` |
+
+**辅助 class**：`.legend`（图例横条）、`.insight`（黄底关键推论框）、`.note`（公式注释）
+
+#### JS 工具集（template.html 已封装，直接抄）
+
+- **`initCanvas(canvas)`** — 高 DPI canvas 初始化（CSS 尺寸 × DPR = 物理像素）
+- **`niceTicks(xMin, xMax, targetCount)`** — 1/2/5×10ⁿ 自适应刻度，返回 `[{x, label}]`（label 含 `toFixed`，避免浮点尾巴）
+- **`ResizeObserver`** — 监听 `.demo-canvas-wrap`（**不是 canvas 本身**——canvas 绝对定位后自身 size 不变）
+- **`requestAnimationFrame(() => initCanvas(...))`** — canvas 绝对定位，初始 `clientWidth/Height` 可能为 0
+
+#### 工程化要点（必做）
+
+1. **CONFIG 集中区**（JS 顶部）：业务常量集中放，方便维护
+   ```js
+   const LASERS = [...];           // 业务数据
+   const SLIDER_IDS = ["..."];     // 滑块 id 清单
+   const DEFAULT_PARAMS = {...};   // 默认参数
+   ```
+2. **Sticky header**：标题滚动时吸顶（`position: sticky; top: 0`），与 body 同色避免穿透
+3. **Footer 模板**（可传播三要素）：
+   ```html
+   <div class="footer-meta">
+     🤖 由 <strong>Agent-X</strong> (@Platform) 通过 
+     <a href="https://atomgit.com/roxszi/skills" target="_blank" rel="noopener">
+       <strong>tech-brief-writer v3.7.0</strong> skill
+     </a> 生成
+   </div>
+   ```
+   - **三要素**：Agent 名 + 平台 / 项目（@CherryStudio 等）+ Skill 链接（**禁用 file://**）
+   - `target="_blank"`：新标签打开（不打断当前阅读）；`rel="noopener"`：防 reverse tabnabbing
+
+#### 反模式红线（看到必须改）
+
+##### 反模式 A：物理公式简化陷阱（分子分母共用项被约掉）
+
+**症状**：用户调某个滑块，但对应物理量在演示里**不响应**——99% 是 bug 不是简化。
+
+**典型案例**（共振拉曼演示面板 C "A/B-term 占比"）：
+```js
+// ❌ 错：A 和 B 共用 D = Δν² + Γ²，Δν 在占比里被约掉
+const A = 1 / Math.pow(dn*dn + gamma*gamma, 2);  // A ∝ 1/D²
+const B = 1 / (dn*dn + gamma*gamma);             // B ∝ 1/D
+const aFrac = A / (A + B);                       // = 1/(1+D)，只依赖 D
+```
+
+**诊断 4 步**：
+1. 用户报告"X 滑块不响应"
+2. 展开占比公式看变量：哪些参数在化简后消失
+3. 数学验证：把 A/(A+B) 化简，看哪些参数被约掉
+4. 跑 `node -e` 数值模拟确认（**不要只靠代码 Review**）
+
+**修复原则**：让分子分母的**频率依赖形状真正不同**（不能共用同一个 D）。例如 A ∝ ΔQ²/D（一阶 Lorentzian），B ∝ Δν²/D²（二阶 Lorentzian × Δν² 加权）。
+
+##### 反模式 B：niceTicks 浮点尾巴（"2.0000000003"）
+
+**症状**：坐标轴标签显示 `2.0000000000000003` 或 `0.6000000000000001` 这类长尾数字。
+
+**根因**：`i * step` 在 `step=0.2` 时浮点累积（`3*0.2 === 0.6` 为 false）。
+
+**修复**（template.html 已实现）：
+- 返回 `[{x, label}]` 而不是裸 `number[]`
+- `label = x.toFixed(decimals)` 统一小数位
+- 整数计数：`ni * niceNorm * mag`（整数 × 整数 × 10ⁿ → 精确）
+
+**教训**：任何要显示给用户的数值都过 `toFixed(decimals)`，不要相信原生浮点的 `.toString()`。
+
+##### 反模式 C：开发注释混入交付内容
+
+**症状**：sidebar 里写"💡 桌面端：滑块固定在左侧...📱 移动端：滑块在顶部..."—— 用户看见 UI 自然懂，不需要解释。
+
+**判断标准**：> 这段文字**去掉后用户会不会困惑**？会困惑 → 保留（但放交付内容里）；不会困惑 → 是开发注释。
+
+**正确做法**（二选一）：
+- 直接删除（最干净）
+- 保留为 HTML 注释：`<!-- 开发备忘：桌面端 sticky / 移动端切 static -->`
+
+#### Agent 行为约束（工具优先级，强约束）
+
+> 违反时 agent 应自我反思——**用户觉得不需要 = 我大概率在过度工程**。
+
+| 场景 | ✅ 正确动作 | ❌ 错误动作 |
+|:---|:---|:---|
+| 改后验证是否生效 | `Read` 工具读文件文本，对照关键 attribute | 起 server 在浏览器看 |
+| 看视觉效果 | `browser_navigate` 到 SVG / HTML 文件（`file://` 或 HTTP） | 自己写 Node server 注册 mime |
+| 读取文件文本 | 直接 `Read` 工具 | 起 server + curl 拿内容 |
+
+**核心原则**：**工具够用就别造轮子**——MCP 内置工具（playwright / Read / Grep / Bash）已覆盖 90% 调试场景。
+
+造工具前自问三件套：
+1. 现有工具真试过了吗？（playwright / Read / Grep / Bash）
+2. 缺的是真能力还是"我以为缺的能力"？
+3. 造工具的成本（11 行代码 + 一个端口 + 一个清理步骤）vs 收益是什么？
 
 ---
 
@@ -354,17 +420,11 @@ DOI / URL 给定
    - 字体用 `font-family="system-ui, -apple-system, 'Segoe UI', 'PingFang SC', sans-serif"` 兜底，**不用等宽字体强行对齐**；
    - 颜色用显式十六进制或 `currentColor`，不依赖外部 CSS class；
    - 文字标注用绝对像素坐标 + `text-anchor="middle/end"`，**不靠字符宽度对齐**。
-4. **脚本是否需要存档 & 生成 SVG 的几种方式**：
-   
-   **a) 脚本类型与存档**（命名沿用目录规范的 `scripts/generate-xx.{html,mjs,ts}`）：
-   - **首推 .html**：理由见目录规范 callout（"scripts/ 首选 `.html` 的理由"）。
-   - **.mjs / .ts**：仅当脚本逻辑重、不需要可视化结果、且团队有 Node 工具链时使用
-   
-   **b) 生成 SVG 的几种方式**：
-   - **几何 / 示意 SVG**：手写即可（参考本 skill 的 `assets/optical-path.svg`）。
-   - **数据驱动 SVG**：`echarts` / `@antv/g2`（CDN 引入即可，需设置好默认输出 SVG 而非 canvas）；**D3.js**（天然输出 SVG DOM，零配置）。
-   - **浏览器渲染转 SVG**：Playwright（headless 截图 → PNG/SVG；PNG 需经 svgtrace 等工具栅矢量化）。
-   - **避免 Python matplotlib / Origin / gnuplot** —— 浏览器/手机/平板/GitHub preview 上 Python 产物无法直接复现。
+4. **脚本存档 & 生成方式**：
+   - 脚本存档命名：`scripts/generate-xx.{html,mjs,ts}`（**首选 `.html`**，理由见目录规范 callout）
+   - **几何 / 示意 SVG**：手写即可（参考 LTRS 的 `assets/optical-path.svg`）
+   - **数据驱动 SVG**：D3.js（天然输出 SVG DOM，零配置）或 echarts（需设置输出 SVG 而非 canvas）
+   - **避免 Python matplotlib / Origin / gnuplot**：浏览器 / 手机 / 平板 / GitHub preview 上无法直接复现
 5. **文件命名示意**（建议风格）：
    - `optical-path.svg` 光路 / 几何示意
    - `trap-geometries.svg` 对比 point / donut / line 等几何形态
@@ -372,6 +432,28 @@ DOI / URL 给定
    - `dual-wavelength-spectrum.svg` 双波长光谱示意
    - `potential-well.svg` 势阱 / 势能面
    - `force-balance.svg` 受力分析
+6. **viewBox 留白 + 弹性显示**（v3.7.0 新增）：
+   - **症状**：SVG 文字标注被 viewBox 边界裁切（如"简正坐标"四个字只显示一半）
+   - **根因**：viewBox 宽度不够 + 文字位置（`x=` / `text-anchor=start`）超出右边界
+   - **修复模板**：
+     ```xml
+     <svg xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 W_PADDED H_PADDED"
+          preserveAspectRatio="xMidYMid meet"
+          style="max-width: W_PADDEDpx; width: 100%; height: auto; display: block; margin: 0 auto;">
+     ```
+   - **设计原则**：
+     - 先定画布内最大元素范围（文字最右端 x 坐标 + 估宽：汉字 ≈ `font-size × 1.0`，英文 ≈ `font-size × 0.55`）
+     - 四周加 padding（通常 20-50px）
+     - **不要写 `width=` / `height=` 属性** → 用 style 的 `max-width`
+     - **保留 `viewBox` + `preserveAspectRatio`** 用于缩放控制
+   - **三件套协同**（缺一失效）：
+     | 属性 | 作用 |
+     |:---|:---|
+     | `max-width: <px>` | 限制最大尺寸，避免大屏拉爆 |
+     | `width: 100%` | 容器内自动撑开 |
+     | `height: auto` | 按 viewBox 比例自适应高度 |
+   - **验证踩坑**：默认 Node http server mime 不带 `.svg` → 浏览器显示 broken/文本。**调试 SVG 用 `Read` 工具读 XML 文本对照 attribute 即可**，需要看视觉时用 playwright 直接 navigate 到 SVG 文件 URL——**不要为 mime 自建 server**（违反 §二「Agent 行为约束」）
 
 ### 3.4 技术依赖处理规则（Avoid Pedagogical Drift）
 
@@ -544,10 +626,14 @@ Mermaid 解析器对节点标签、边标签、箭头语法有严格的保留字
 ### 5.2 演示 / 资源章节自检
 
 - [ ] **§二·HTML 触发条件**：该技术是否触发？若触发 → HTML 已生成？判据见 §二 "不需要交互可视化的情况"。
-- [ ] **§二·HTML 技术要求**：零依赖 + 高 DPI + 中文注释 + 参数可调？
+- [ ] **§二·HTML 技术 + 工程化样式框架**：从 [`template.html`](template.html) 起步？6 class（`demo-*`）+ CONFIG（`LASERS` / `SLIDER_IDS` / `DEFAULT_PARAMS`）齐全？零依赖 + 中文注释 + 物理忠实？
 - [ ] **§二·HTML 实测**：本地浏览器打开后，**每个滑块/下拉/按钮**至少点 1 次；连续运行 ≥ 30 秒无崩溃；目视确认无画面异常（无累积放大、无坐标偏移）。
 - [ ] **§二·Canvas 散点反模式**：演示涉及散点时已用 Mulberry32 + 固定 SCATTER_OFFSETS（详见 §二 "Canvas 散点可视化反模式"）？
-- [ ] **§三·3.3 SVG**：SVG 全流程合规？——外置 assets/ + md 引用 + 字体/锚点/颜色合规？生成式 SVG 已配 `scripts/generate-xx.{html,mjs,ts}` 留档？
+- [ ] **§二·niceTicks 浮点尾巴**：坐标轴标签是否过 `toFixed(decimals)`？裸 `number[]` 已替换为 `[{x, label}]`？无 `2.0000000003` 这类长尾数字？
+- [ ] **§二·物理公式简化陷阱**：占比 / 归一化公式的分子分母有没有共用项被约掉？拖每个滑块（含 ΔQ、λ_max、Γ 等）对应物理量都响应？**必须 node 模拟验证，不只靠 Review。**
+- [ ] **§二·开发注释 vs 交付内容**：sidebar / hint 区块无"💡 桌面端 sticky..."这类开发注释（已挪到 HTML 注释或删除）？`template.html` 顶部的「⚙」标记注释已删除？
+- [ ] **§二·Footer 模板**：含三要素（Agent 名 + 平台 + Skill 链接）？Skill 链接是**可传播 URL**（非 file://）？`target="_blank" rel="noopener"`？
+- [ ] **§三·3.3 SVG**：全流程合规？——外置 assets/ + md 引用 + 字体/锚点/颜色合规？**viewBox 留白 + 弹性显示**（三件套 `max-width` / `width:100%` / `height:auto` 齐全，文字无截断）？生成式 SVG 已配 `scripts/generate-xx.{html,mjs,ts}` 留档？
 
 ### 5.3 诚实性 / 反模式自检
 
@@ -565,9 +651,11 @@ Mermaid 解析器对节点标签、边标签、箭头语法有严格的保留字
 |:---|:---|:---|
 | `LTRS/` | **复杂技术（多原理交叉）的范式** | 灵魂锚点的提炼方式（§2.2 四要素表）、技术变体章节（§5）、依赖地图（§13）的完整结构 |
 | `SERDS/` | **单一物理机理的范式** | 一句话锚点（坐标对偶性表）、关键概念的简洁呈现、参考文献分类排列（§10） |
+| `template.html` | **交互演示工程化骨架** | 6 class 样式框架（`demo-*`）、CONFIG 集中区、niceTicks / drawAxes / ResizeObserver 全套工具、Footer 三要素 |
 
 **使用建议**：
 
-- 第一次写简报时，先打开这两份范式扫一遍结构
+- 第一次写简报时，先打开 LTRS / SERDS 扫一遍结构
+- 第一次写交互演示时，从 `template.html` 复制起步（详见 §一 末尾 callout）
 - 在具体写某一章时，再打开范式对应章节对照
 - 不要**照抄**范式内容——范式是"长什么样"的参考，不是"写什么"的模板

@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{技术名}演示 — 工程化骨架（template.html v3.7.0）</title>
+
+<!-- ⚙ 工程化交互演示骨架（template.html）· tech-brief-writer skill v3.7.0
+     复制本文件 → 重命名为「交互演示.html」→ 替换所有 {占位符}
+     ⚙ 复制后请删除所有「⚙」标记的开发注释（顶部 + sidebar 备忘）
+     完整规范见 SKILL.md §二「工程化样式框架」与「反模式 A/B/C」 -->
+
+<style>
+  /* =====================================================================
+     CSS 框架（6 class 命名空间：demo-*）
+     =====================================================================
+     架构：.demo-header > .demo-app > (.demo-controls + .demo-main) + footer
+     复用：整段拷贝到新 HTML 的 <style> 块，class 名不要改
+     ⚠️ CSS 只支持  注释，不要写 // 行注释（会被浏览器忽略整段）
+     ===================================================================== */
+
+  /* 基础排版 */
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC",
+                 "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: #f5f7fa;
+    color: #222;
+    line-height: 1.5;
+  }
+
+  /* ── 1. Sticky 顶部标题区 ────────────────────────────────────────────
+     滚动时吸顶可见；与 body 同色避免内容穿透；底部蓝边框区分标题与正文 */
+  .demo-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #f5f7fa;
+    padding: 12px 0 8px 0;
+    margin-bottom: 16px;
+    border-bottom: 2px solid #1565c0;
+  }
+  .demo-header h1 {
+    font-size: 22px;
+    color: #1565c0;
+    margin: 0;
+  }
+  .demo-header .subtitle {
+    font-size: 13px;
+    color: #666;
+    margin: 4px 0 0 0;
+  }
+
+  /* ── 2. 主 Grid 布局 ─────────────────────────────────────────────────
+     桌面端：260px sidebar + 1fr main
+     移动端（≤ 768px）：单列堆叠，sidebar 在上 */
+  .demo-app {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 16px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  @media (max-width: 768px) {
+    .demo-app { grid-template-columns: 1fr; }
+  }
+
+  /* ── 3. 左侧参数侧栏（sticky） ────────────────────────────────────── */
+  .demo-controls {
+    background: white;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    position: sticky;
+    top: 16px;        /* 桌面端：滑块固定在视口顶部 */
+    align-self: start;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+  @media (max-width: 768px) {
+    .demo-controls {
+      position: static;   /* 移动端：取消 sticky */
+      max-height: none;
+    }
+  }
+  .demo-controls h3 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1565c0;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 8px;
+  }
+  .demo-controls .control {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 14px;
+  }
+  .demo-controls .control label {
+    font-size: 12px;
+    color: #555;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .demo-controls .control label .val {
+    font-weight: 600;
+    color: #1565c0;
+    font-size: 13px;
+  }
+  .demo-controls input[type=range] {
+    width: 100%;
+    cursor: pointer;
+    margin: 0;
+  }
+
+  /* ── 4. 主面板容器 ───────────────────────────────────────────────────
+     min-width: 0 防止 grid 子项溢出（grid 默认 min-width: auto 会让 canvas 撑爆） */
+  .demo-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* ── 5. 单个面板卡片 ───────────────────────────────────────────────── */
+  .demo-panel {
+    background: white;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+  .demo-panel h3 {
+    margin: 0 0 8px 0;
+    font-size: 15px;
+    color: #333;
+  }
+
+  /* ── 6. canvas 响应式包装 ────────────────────────────────────────────
+     aspect-ratio 替代 JS 算高度：浏览器原生 CSS-only
+     canvas 绝对定位在 wrapper 内（top/left/width/height 都 100%） */
+  .demo-canvas-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 7;
+    background: #fafafa;
+    border-radius: 4px;
+  }
+  @media (max-width: 768px) {
+    .demo-canvas-wrap { aspect-ratio: 4 / 3; }   /* 移动端更高一些，避免太窄 */
+  }
+  .demo-canvas-wrap canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  /* ── 辅助 class：图例 / 关键推论 / 公式注释 ────────────────────────── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: #555;
+  }
+  .legend .dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  .insight {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: #fff9c4;
+    border-left: 3px solid #fbc02d;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #5d4037;
+  }
+  .note {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #777;
+    font-style: italic;
+  }
+
+  /* ── Footer 三要素 ─────────────────────────────────────────────────── */
+  .footer-meta {
+    margin-top: 24px;
+    padding: 14px 0;
+    border-top: 1px solid #e0e0e0;
+    text-align: center;
+    font-size: 12px;
+    color: #777;
+  }
+  .footer-meta a {
+    color: #1565c0;
+    text-decoration: none;
+  }
+  .footer-meta a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<!-- =====================================================================
+     顶部 sticky header（吸顶可见）
+     ===================================================================== -->
+<header class="demo-header">
+  <h1>{技术名}演示</h1>
+  <div class="subtitle">{一句话副标题，呼应 MD 简报 §2.2 灵魂锚点}</div>
+</header>
+
+<!-- =====================================================================
+     主布局：左滑块 + 右面板
+     ===================================================================== -->
+<div class="demo-app">
+
+  <!-- ─── 左侧参数侧栏 ─────────────────────────────────────────────────── -->
+  <aside class="demo-controls">
+    <h3>参数控制</h3>
+
+    <!-- 滑块示例：复制此 <div class="control"> 块扩展更多滑块 -->
+    <div class="control">
+      <label>参数 1 <span class="val" id="param1-val">50</span></label>
+      <input type="range" id="param1" min="0" max="100" step="1" value="50">
+    </div>
+
+    <div class="control">
+      <label>参数 2 <span class="val" id="param2-val">1.0</span></label>
+      <input type="range" id="param2" min="0.1" max="3.0" step="0.1" value="1.0">
+    </div>
+
+    <!-- ⚙ 反模式 C 教学示例：开发注释应放 HTML 注释里（用户看不见）
+         复制本模板做新演示时，请删除此开发备忘块。
+         判断标准：这段文字去掉后用户会不会困惑？不会 = 开发注释。
+         桌面端：滑块固定在左侧（.demo-controls sticky）
+         移动端：滑块在顶部（@media max-width: 768px → position: static） -->
+  </aside>
+
+  <!-- ─── 右侧主面板 ───────────────────────────────────────────────────── -->
+  <main class="demo-main">
+
+    <!-- 面板 A：示例 1（高斯曲线，参数 1 控制中心位置） -->
+    <div class="demo-panel">
+      <h3>面板 A：{标题}</h3>
+      <div class="demo-canvas-wrap">
+        <canvas id="panelA"></canvas>
+      </div>
+      <div class="legend">
+        <span><span class="dot" style="background:#1565c0"></span>系列 1</span>
+        <span><span class="dot" style="background:#e65100"></span>系列 2</span>
+      </div>
+      <div class="insight">
+        💡 {关键推论：参数 1 增大 → 曲线中心右移，对应物理意义是 XXX}
+      </div>
+    </div>
+
+    <!-- 面板 B：示例 2（柱状图，参数 2 控制柱高，演示分类轴 noXTicks=true） -->
+    <div class="demo-panel">
+      <h3>面板 B：{标题}</h3>
+      <div class="demo-canvas-wrap">
+        <canvas id="panelB"></canvas>
+      </div>
+      <div class="note">{公式注释：增强倍数 = (强度比) × (基数比) · 详见 MD 简报 §4}</div>
+    </div>
+
+  </main>
+</div>
+
+<!-- =====================================================================
+     Footer（可传播三要素：Agent / 平台 / Skill 链接）
+     =====================================================================
+     ⚠️ 红线：Skill 链接必须可传播 URL，禁用 file://
+     ⚠️ 红线：开发注释（"桌面端 sticky..."等）不要写在交付内容里 -->
+<footer class="footer-meta">
+  🤖 由 <strong>{Agent 名}</strong> (@{平台名}) 通过
+  <a href="https://atomgit.com/roxszi/skills" target="_blank" rel="noopener">
+    <strong>{tech-brief-writer v3.7.0}</strong> skill
+  </a> 生成
+</footer>
+
+<script>
+// =====================================================================
+// JS 框架（工具层 + 业务层）
+// =====================================================================
+// 架构（自下而上）：
+//   工具层    initCanvas / niceTicks / drawAxes   ← 不要改（业务无关）
+//   业务层    CONFIG / 业务公式 / drawPanelX       ← 按演示主题替换
+//   入口层    updateAll + 事件绑定 + 初始化        ← 不要改（除非扩展滑块机制）
+// =====================================================================
+
+
+// ─── CONFIG: 业务常量集中区 ─────────────────────────────────────────────
+// 修改这里调整演示行为；不要把业务常量散落到各 drawPanelX 函数里
+const CONFIG = {
+  // 业务数据（如多档激光 / 多个样本 / 多个频率）
+  SERIES: [
+    { name: "532 nm", value: 532, color: "#e65100" },
+    { name: "638 nm", value: 638, color: "#d32f2f" },
+    { name: "785 nm", value: 785, color: "#6a1b9a" }
+  ],
+
+  // 滑块 id 清单（新增/删除滑块时同步改这里 + HTML）
+  SLIDER_IDS: ["param1", "param2"],
+
+  // 默认参数（初始加载时使用）
+  DEFAULT_PARAMS: { param1: 50, param2: 1.0 }
+};
+
+
+// =====================================================================
+// 工具层：高 DPI canvas + 自适应刻度 + 坐标轴绘制
+// =====================================================================
+// 这些函数与业务无关，原样保留即可。修 bug 时优先看 SKILL.md §二反模式清单。
+
+
+// 高 DPI canvas 初始化
+// 关键：CSS 控制显示尺寸（width/height: 100%），物理像素 = css × dpr
+// canvas.width/height 属性是物理像素，不在 CSS 中暴露
+function initCanvas(canvas) {
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth;
+  const cssH = canvas.clientHeight;
+  if (cssW === 0 || cssH === 0) return;   // 布局还没准备好（canvas 绝对定位初始可能为 0）
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  canvas._ctx = canvas.getContext("2d");
+  canvas._dpr = dpr;
+  canvas._cssW = cssW;
+  canvas._cssH = cssH;
+}
+
+
+// niceTicks：1/2/5×10ⁿ 自适应步长 + 整数计数 + toFixed 规避浮点尾巴
+// 返回 [{x, label}]：x 是数值（整数乘法保证精确），label 是字符串（统一小数位）
+// 反模式 B 修复：i * step 在 step=0.2 时出 0.6000000000000001 → 改用 ni*niceNorm*mag
+function niceTicks(xMin, xMax, targetCount) {
+  const range = xMax - xMin;
+  if (range <= 0) return [];
+  const roughStep = range / Math.max(1, targetCount);
+  const magLog = Math.floor(Math.log10(roughStep));         // 整数
+  const norm   = roughStep / Math.pow(10, magLog);
+  let niceNorm;                                             // 整数 1/2/5/10
+  if      (norm < 1.5) niceNorm = 1;
+  else if (norm < 3)   niceNorm = 2;
+  else if (norm < 7)   niceNorm = 5;
+  else                 niceNorm = 10;
+  const mag = Math.pow(10, magLog);
+  const decimals = Math.max(0, -magLog);                    // 统一小数位
+  const ticks = [];
+  const startN = Math.ceil(xMin / (niceNorm * mag));
+  const endN   = Math.floor(xMax / (niceNorm * mag));
+  for (let ni = startN; ni <= endN; ni++) {
+    const x = ni * niceNorm * mag;                          // 整数×整数×10ⁿ，浮点干净
+    ticks.push({ x: x, label: x.toFixed(decimals) });
+  }
+  return ticks;
+}
+
+
+// 画坐标轴 + 网格 + 标签，返回坐标变换函数
+// 参数 noXTicks=true：跳过 X 网格竖线 + X 刻度文字（用于分类轴，如面板 B 的激光名）
+function drawAxes(ctx, dpr, w, h, xMin, xMax, yMin, yMax, xLabel, yLabel, yLog, noXTicks) {
+  const left = 60, right = w - 30, top = 30, bottom = h - 40;
+
+  // 每次重绘前重置 transform（避免 DPR 累积放大）
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  // 网格（横竖浅灰线）
+  ctx.strokeStyle = "#f0f0f0";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  if (!noXTicks) {
+    const xGridTicks = niceTicks(xMin, xMax, Math.max(3, Math.floor((right - left) / 50)));
+    xGridTicks.forEach(t => {
+      const px = left + (t.x - xMin) / (xMax - xMin) * (right - left);
+      ctx.moveTo(px, top);
+      ctx.lineTo(px, bottom);
+    });
+  }
+  if (yLog) {
+    const logMin = Math.log10(yMin);
+    const logMax = Math.log10(yMax);
+    for (let logY = Math.ceil(logMin); logY <= logMax; logY++) {
+      const py = bottom - (logY - logMin) / (logMax - logMin) * (bottom - top);
+      ctx.moveTo(left, py);
+      ctx.lineTo(right, py);
+    }
+  } else {
+    const yTicks = niceTicks(yMin, yMax, 5);
+    yTicks.forEach(t => {
+      const py = bottom - (t.x - yMin) / (yMax - yMin) * (bottom - top);
+      ctx.moveTo(left, py);
+      ctx.lineTo(right, py);
+    });
+  }
+  ctx.stroke();
+
+  // 主坐标轴（黑色实线）
+  ctx.strokeStyle = "#333";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(left, top);
+  ctx.lineTo(left, bottom);
+  ctx.lineTo(right, bottom);
+  ctx.stroke();
+
+  // X 刻度文字（自适应密度：每个标签 ≥ 50 px）
+  if (!noXTicks) {
+    ctx.fillStyle = "#444";
+    ctx.font = "11px system-ui";
+    ctx.textAlign = "center";
+    const xTicks = niceTicks(xMin, xMax, Math.max(3, Math.floor((right - left) / 50)));
+    xTicks.forEach(t => {
+      const px = left + (t.x - xMin) / (xMax - xMin) * (right - left);
+      ctx.fillText(t.label, px, bottom + 15);
+    });
+  }
+
+  // Y 刻度文字
+  ctx.textAlign = "right";
+  if (yLog) {
+    const logMin = Math.log10(yMin);
+    const logMax = Math.log10(yMax);
+    for (let logY = Math.ceil(logMin); logY <= logMax; logY++) {
+      const py = bottom - (logY - logMin) / (logMax - logMin) * (bottom - top);
+      ctx.fillText("10^" + logY, left - 5, py + 4);
+    }
+  } else {
+    const yTicks = niceTicks(yMin, yMax, 5);
+    yTicks.forEach(t => {
+      const py = bottom - (t.x - yMin) / (yMax - yMin) * (bottom - top);
+      ctx.fillText(t.label, left - 5, py + 4);
+    });
+  }
+
+  // 轴标签（X 横排 / Y 旋转 90°）
+  ctx.font = "13px system-ui";
+  ctx.fillStyle = "#333";
+  ctx.textAlign = "center";
+  ctx.fillText(xLabel, (left + right) / 2, h - 5);
+  ctx.save();
+  ctx.translate(15, (top + bottom) / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = "center";
+  ctx.fillText(yLabel, 0, 0);
+  ctx.restore();
+
+  // 返回坐标变换函数（业务层绘图用）
+  return {
+    xToPx: x => left + (x - xMin) / (xMax - xMin) * (right - left),
+    yToPx: y => {
+      if (yLog) {
+        return bottom - (Math.log10(Math.max(y, yMin)) - Math.log10(yMin)) /
+               (Math.log10(yMax) - Math.log10(yMin)) * (bottom - top);
+      }
+      return bottom - (y - yMin) / (yMax - yMin) * (bottom - top);
+    },
+    top, bottom, left, right
+  };
+}
+
+
+// =====================================================================
+// 业务层：业务公式 + 面板渲染
+// =====================================================================
+// 按演示主题替换。参考 SKILL.md §二反模式 A「物理公式简化陷阱」：
+//   占比 / 归一化公式的分子分母不能共用项被约掉，否则会失去对某些参数的响应。
+
+
+// 业务公式示例：高斯函数（替换为本演示实际需要的物理公式）
+function gaussian(x, x0, width) {
+  const sigma = width / 2.355;
+  return Math.exp(-0.5 * Math.pow((x - x0) / sigma, 2));
+}
+
+
+// 面板 A：高斯曲线（param1 控制中心，演示线性 X 轴）
+function drawPanelA() {
+  const param1 = parseFloat(document.getElementById("param1").value);
+  document.getElementById("param1-val").textContent = param1;
+
+  const ctx = canvasA._ctx;
+  const w = canvasA._cssW, h = canvasA._cssH;
+
+  // 坐标范围：X 0-100，Y 0-1.1
+  const { xToPx, yToPx, top, bottom } = drawAxes(
+    ctx, canvasA._dpr, w, h, 0, 100, 0, 1.1,
+    "自变量 X", "因变量 Y", false
+  );
+
+  // 高斯曲线（param1 = 中心位置；宽度固定 20）
+  ctx.strokeStyle = "#1565c0";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let x = 0; x <= 100; x += 1) {
+    const y = gaussian(x, param1, 20);
+    if (x === 0) ctx.moveTo(xToPx(x), yToPx(y));
+    else ctx.lineTo(xToPx(x), yToPx(y));
+  }
+  ctx.stroke();
+
+  // 当前中心位置垂直虚线
+  ctx.strokeStyle = "#c62828";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 3]);
+  ctx.beginPath();
+  ctx.moveTo(xToPx(param1), top);
+  ctx.lineTo(xToPx(param1), bottom);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 标注中心值
+  ctx.fillStyle = "#c62828";
+  ctx.font = "italic 12px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("中心 = " + param1, xToPx(param1), top + 16);
+}
+
+
+// 面板 B：分类柱状图（param2 控制柱高缩放，演示 noXTicks=true 分类轴）
+function drawPanelB() {
+  const param2 = parseFloat(document.getElementById("param2").value);
+  document.getElementById("param2-val").textContent = param2.toFixed(1);
+
+  const ctx = canvasB._ctx;
+  const w = canvasB._cssW, h = canvasB._cssH;
+
+  // 坐标范围：X 是分类轴（用 0-SERIES.length 占位），Y 0-3
+  const { xToPx, yToPx, top, bottom, left, right } = drawAxes(
+    ctx, canvasB._dpr, w, h, 0, CONFIG.SERIES.length, 0, 3,
+    "分类轴（激光 / 样本 / 频率）", "数值（× param2）", false,
+    true    // noXTicks=true：分类轴，跳过数字刻度，由本函数自己画类目名
+  );
+
+  // 柱子（按 CONFIG.SERIES 循环）
+  const barW = 0.5;
+  CONFIG.SERIES.forEach((s, i) => {
+    const cx = i + 0.5;
+    const height = (s.value / 300) * param2;       // 占位公式，替换为实际计算
+    const py = yToPx(height);
+
+    ctx.fillStyle = s.color;
+    ctx.fillRect(xToPx(cx - barW / 2), py, xToPx(cx + barW / 2) - xToPx(cx - barW / 2), bottom - py);
+
+    // 类目名（X 轴下方）
+    ctx.fillStyle = "#444";
+    ctx.font = "12px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(s.name, xToPx(cx), bottom + 18);
+
+    // 数值标注
+    ctx.fillStyle = "#222";
+    ctx.font = "bold 13px system-ui";
+    ctx.fillText(height.toFixed(2), xToPx(cx), py - 8);
+  });
+}
+
+
+// =====================================================================
+// 入口层：更新 + 事件绑定 + 初始化
+// =====================================================================
+
+const canvasA = document.getElementById("panelA");
+const canvasB = document.getElementById("panelB");
+
+
+// 更新入口（所有滑块 input → 重绘全部面板）
+function updateAll() {
+  if (canvasA._ctx) drawPanelA();
+  if (canvasB._ctx) drawPanelB();
+}
+
+
+// ResizeObserver：监听 .demo-canvas-wrap（不是 canvas 本身）
+// 移动端旋转 / 虚拟键盘 / 侧栏折叠都不会触发 window.resize，必须用 ResizeObserver
+function setupResizeObserver() {
+  if (typeof ResizeObserver === "undefined") {
+    // 降级方案
+    window.addEventListener("resize", () => {
+      initCanvas(canvasA);
+      initCanvas(canvasB);
+      updateAll();
+    });
+    return;
+  }
+  const ro = new ResizeObserver(() => {
+    initCanvas(canvasA);
+    initCanvas(canvasB);
+    updateAll();
+  });
+  // 监听 canvas 父容器（.demo-canvas-wrap），容器尺寸变化时重新适配
+  ro.observe(canvasA.parentElement);
+  ro.observe(canvasB.parentElement);
+}
+
+
+// 等一帧确保布局完成（canvas 在 wrapper 内绝对定位，初始 clientWidth/Height 可能为 0）
+requestAnimationFrame(() => {
+  initCanvas(canvasA);
+  initCanvas(canvasB);
+  setupResizeObserver();
+  updateAll();
+});
+
+
+// 滑块事件绑定（基于 CONFIG.SLIDER_IDS，自动适配新增/删除滑块）
+CONFIG.SLIDER_IDS.forEach(id => {
+  document.getElementById(id).addEventListener("input", updateAll);
+});
+</script>
+
+</body>
+</html>

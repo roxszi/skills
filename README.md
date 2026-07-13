@@ -8,6 +8,18 @@
 
 ---
 
+## Skills 总览
+
+<!-- BEGIN: SKILLS-TABLE (auto) -->
+| Skill | 版本 | 触发一句话 | 依赖 |
+|---|---|---|---|
+| [`local-kb`](#local-kb--本地信息资源数据库) | 1.5.2 | "本地信息资源数据库的统一执行入口" | bun |
+| [`ocr-toolkit`](#ocr-toolkit--OCR-工具箱) | 1.0.2 | "OCR 工具选型与流水线构建" | python |
+| [`tech-brief-writer`](#tech-brief-writer--技术简报撰写) | 3.7.0 | "技术简报撰写" | — |
+<!-- END: SKILLS-TABLE -->
+
+---
+
 ## 一键安装
 
 ```bash
@@ -32,19 +44,7 @@ npx skills add roxszi/skills --list
 
 ---
 
-## Skills 总览
-
-<!-- BEGIN: SKILLS-TABLE (auto) -->
-| Skill | 版本 | 触发一句话 | 依赖 |
-|---|---|---|---|
-| [`local-kb`](#local-kb--本地信息资源数据库) | 1.5.2 | "本地信息资源数据库的统一执行入口" | bun |
-| [`ocr-toolkit`](#ocr-toolkit--OCR 工具箱) | 1.0.2 | "OCR 工具选型与流水线构建" | python |
-| [`tech-brief-writer`](#tech-brief-writer--技术简报撰写) | 3.6.0 | "技术简报撰写" | — |
-<!-- END: SKILLS-TABLE -->
-
----
-
-## 📚 `local-kb` — 本地信息资源数据库
+## `local-kb` — 本地信息资源数据库
 
 本地知识库的统一执行入口。给文献、健康档案、项目档案、联系人档案、会议纪要等"长期累积 + 检索 + 反查 + 备份"场景用。
 
@@ -76,7 +76,7 @@ npx skills add roxszi/skills --list
 
 ---
 
-## 🔍 `ocr-toolkit` — OCR 工具箱
+## `ocr-toolkit` — OCR 工具箱
 
 中文 OCR + PDF 扫描件 + 科研文献 / 体检报告 / 病历 / 发票等场景。基于 Python `rapidocr-onnxruntime` + `pymupdf` + `pdfplumber`。
 
@@ -112,7 +112,7 @@ PDF → pymupdf 判定有无文本层
 
 ---
 
-## 📝 `tech-brief-writer` — 技术简报撰写
+## `tech-brief-writer` — 技术简报撰写
 
 为某项技术（尤指物理 / 化学 / 光谱 / 仪器 / 计量学交叉域）撰写"可存档技术简报"。产出 **MD 简报 + 可选交互式 HTML 演示**双件套。
 
@@ -174,6 +174,7 @@ skills/
         ├── LTRS/
         ├── SERDS/
         ├── SKILL.md
+        ├── template.html
         └── template.md
 ```
 <!-- END: DIR-TREE -->
