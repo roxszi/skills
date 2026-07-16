@@ -3,7 +3,7 @@ name: 技术简报撰写
 slug: tech-brief-writer
 description: 技术简报撰写。为某项技术/方法/仪器原理撰写"可存档技术简报"时使用。产出"MD 简报 + 可选交互式 HTML 演示"双件套。当用户说"写个技术简报""帮我把 XX 技术整理成备忘""看一下这篇文章用的技术并存档"等表述时触发。本 skill 定义了简报的目录规范、11 章节模板（含独立术语表与参考文献章节）、技术依赖处理规则、图/公式/算例要求、交互演示规格、诚实性红线与交付前自检清单。配套：`template.md`（MD 骨架）+ `template.html`（HTML 工程化骨架）双模板。
 author: RoxSzi (SI_Cheng-Yun, 司承运)
-version: 4.1.0
+version: 4.1.1
 license: MulanPSL v2
 ---
 
@@ -575,42 +575,57 @@ Mermaid 解析器对节点标签、边标签、箭头语法有严格的保留字
 
 > ⚠️ **写完 Mermaid 未实测 = 未交付**（硬性要求）——交付物中残留未渲染的 mermaid 块 = 烂尾。
 
-写完 Mermaid 后**必须**用 mermaid 库（不依赖任何 markdown 渲染器）实测一次：
+**调用流程**（按宿主浏览器工具实际 API 调整）：
+1. 把下面 HTML 写到本地临时文件（如 `C:\Users\<user>\AppData\Local\Temp\mermaid-verify.html`）
+2. 用宿主浏览器工具 `navigate` 到该 `file://` URL，等 `load` 事件
+3. 额外等待 3-5 秒（让 CDN 脚本异步执行 `mermaid.render`）
+4. 读取 `#out` 元素的 `textContent`
 
-1. **本地预览**：用宿主可用的 Markdown 预览工具（VSCode + Markdown Preview Enhanced / Typora / Obsidian 等，具体按宿主实际选用）打开 MD 文件，确认 Mermaid 块渲染无报错。
-2. **逐项对照踩坑清单**：把上表逐项扫一遍，特别注意 `\|` / 箭头组合 / 节点 ID / `<br/>` / **边标签内含括号**这五类高频坑。
-3. **失败定位**：若渲染失败，根据报错定位到具体行号 → 在原 MD 的 Mermaid 块中标注问题字符 → 修改 → 重新预览。
-4. **跨平台一致性**：Mermaid 版本不一致会导致同一段代码在不同环境渲染不同。建议在简报末尾注明使用的 Mermaid 版本范围（如"v10+ 推荐"）。
-
-#### 浏览器快速验证模板（复制粘贴即可）
-
-打开任意网页（如 `about:blank`），打开 dev tools console，粘贴下面这段：
-
-```javascript
-// 一次性加载 mermaid 库（CDN）
-const s = document.createElement('script');
-s.src = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
-await new Promise(r => s.onload = r);
+**HTML 模板**：
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+</head>
+<body>
+<div id="out">加载中...</div>
+<script>
 mermaid.initialize({ startOnLoad: false });
 
-// 把要验证的 mermaid 块原样粘到下面 code 变量里
-const code = `flowchart LR
-    A["源"] -->|"边标签含 (括号) 测试"| B["节点"]
-    B --> C["结束"]`;
+// ▼▼▼ 把要验证的 mermaid 块原样粘到下面 code 变量里 ▼▼▼
+const code = `flowchart TD
+    A["源"] --> B["目标"]`;
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-try {
-  const { svg } = await mermaid.render('test', code);
-  console.log('✓ Mermaid 渲染成功，svg 长度:', svg.length);
-  // 可选：document.body.innerHTML = svg  →  直观看到渲染结果
-} catch (e) {
-  console.error('✗ Mermaid 解析失败：', e.message);
-  // 失败时按本节踩坑清单逐条对照修改
-}
+(async () => {
+  try {
+    const { svg } = await mermaid.render('test', code);
+    document.getElementById('out').textContent =
+      'OK svg_len=' + svg.length;
+  } catch (e) {
+    document.getElementById('out').textContent =
+      'FAIL ' + e.message;
+  }
+})();
+</script>
+</body>
+</html>
 ```
 
-- `svg 长度 > 0` → 通过，可视为已验证
-- 抛 `Parse error on line N: ...` → 失败，按报错行号 + 踩坑清单修改后重测
+**判定规则**：
+- 返回 `OK svg_len=<number>`（number > 0）→ 通过，可视为已验证
+- 返回 `FAIL <error message>` → 失败，按报错行号 + §三·3.5 踩坑清单修改后重测
 - **不通过 = 未通过 SOP**——不要在失败状态下交付
+
+**反模式**（看到立刻换路径）：
+- ❌ 在 `evaluate` 类工具的临时 context 里 `createElement('script')` + `await` 动态加载 CDN——容易触发 `Execution context was destroyed`
+- ❌ 浏览器工具失败 ≥ 1 次后反复重试——立刻改用 IDE Markdown preview 自验（VSCode + Markdown Preview Enhanced / Typora / Obsidian 都支持 mermaid 渲染）
+
+**最小充分条件**（避免过度验证）：
+- ✅ 单图渲染成功（svg 长度 > 0）——必要且充分
+- ❌ "同 HTML 多图 ID 不冲突"——mermaid 文档保证每块独立解析，无需测试
 
 ---
 
