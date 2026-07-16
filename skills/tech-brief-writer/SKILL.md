@@ -3,7 +3,7 @@ name: 技术简报撰写
 slug: tech-brief-writer
 description: 技术简报撰写。为某项技术/方法/仪器原理撰写"可存档技术简报"时使用。产出"MD 简报 + 可选交互式 HTML 演示"双件套。当用户说"写个技术简报""帮我把 XX 技术整理成备忘""看一下这篇文章用的技术并存档"等表述时触发。本 skill 定义了简报的目录规范、10 章节模板（含参考文献独立章节）、技术依赖处理规则、图/公式/算例要求、交互演示规格、诚实性红线与交付前自检清单。配套：`template.md`（MD 骨架）+ `template.html`（HTML 工程化骨架）双模板。
 author: RoxSzi (SI_Cheng-Yun, 司承运)
-version: 4.0.0
+version: 4.0.1
 license: MulanPSL v2
 ---
 
