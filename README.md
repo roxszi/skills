@@ -13,9 +13,9 @@
 <!-- BEGIN: SKILLS-TABLE (auto) -->
 | Skill | 版本 | 触发一句话 | 依赖 |
 |---|---|---|---|
-| [`local-kb`](#本地信息资源数据库) | 1.5.2 | "本地信息资源数据库的统一执行入口" | bun |
+| [`local-kb`](#本地信息资源数据库) | 1.6.0 | "本地信息资源数据库的统一执行入口" | bun |
 | [`ocr-toolkit`](#ocr-工具箱) | 1.0.2 | "OCR 工具选型与流水线构建" | python |
-| [`tech-brief-writer`](#技术简报撰写) | 4.1.3 | "技术简报撰写" | — |
+| [`undefined`](#tech-brief-writer) | 4.1.3 | "技术简报撰写" | — |
 <!-- END: SKILLS-TABLE -->
 
 ---
@@ -163,7 +163,7 @@ skills/
     │   ├── scripts/
     │   ├── README.md
     │   └── SKILL.md
-    └── tech-brief-writer/
+    └── undefined/
         ├── LTRS/
         ├── SERDS/
         ├── SKILL.md

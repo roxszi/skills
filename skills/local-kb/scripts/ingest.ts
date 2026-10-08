@@ -31,9 +31,17 @@
  *   - --print-slug 预校验：跑完整 schema 校验，不用真入库就能发现字段问题
  *   - --cleanup-mock：一键清理 mock 数据（按 slug 模式匹配）
  *   - --mock 入库后输出清理命令
+ *
+ * v1.6.0 新特性：
+ *   - --load <path_field>=<source_file>：直接带外部全文文件入库，自动复制到
+ *     <slug>/ 目录并写回路径字段，免手动 print-slug→mkdir→move 四步；
+ *     字段名先校验（schema 存在 + type:path + _path↔_text 配对），不合法报错退出
+ *   - 唯一字段/主键查重上移到路径处理之前：DOI 已存在沿用旧 slug 时，
+ *     <slug> 展开与 --load 落盘均按最终 slug 执行（修复重入库落错目录的时序坑）
+ *   - 入库事务后自动 wal_checkpoint(FULL)（busy=1 时告警），并回显 fts 字段长度
  */
 
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, readFileSync, copyFileSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { resolveKbPath, openDb, ensureSchema } from "./db.ts";
 import { parseYaml, type YamlObject } from "./yaml.ts";
@@ -290,9 +298,112 @@ function applyPathTextAutoload(
   }
 }
 
+// ===== v1.6.0 NEW: --load 外部文件落盘 =====
+
+/**
+ * --load <path_field>=<source_file>：把外部文件复制进 record 目录并写回路径字段。
+ *
+ * 设计：
+ * - 只负责放文件 + 写路径，内容加载复用 applyPathTextAutoload 现有链路（不造第二条加载路径）。
+ * - 目标解析：meta 已显式写 path 字段（可含 <slug> 占位符）→ 展开后作为目标；
+ *   未写 → 默认 <slug>/<field 去掉 _path 后缀>.md，并写回 meta。
+ * - 写回 db/落盘的永远是展开后的相对路径（正斜杠归一化，防 YAML 反斜杠转义问题），
+ *   不是 resolve 后的绝对结果——保证库可搬迁；复制动作单独用绝对路径。
+ * - 准入校验（fail loud）：字段必须在 schema 且 type:path 且存在 _path↔_text(fts) 配对
+ *   （与 autoload 同一准入）；同字段重复出现报错（last-wins 会掩盖失误）；
+ *   源文件不存在报错。
+ * - 源与目标相同 → 跳过复制（部分平台 copyFileSync(src, src) 抛 EPERM）。
+ */
+function applyLoadArgs(
+  meta: MetaYaml,
+  schema: SchemaYaml,
+  loads: string[],
+  rootDir: string,
+  finalSlug: string,
+): void {
+  if (loads.length === 0) return;
+  const pathFields = new Map(
+    (schema.fields.optional ?? []).filter((f) => f.type === "path").map((f) => [f.name, f]),
+  );
+  const ftsTextFields = (schema.fields.optional ?? []).filter(
+    (f) => f.type === "text" && f.fts,
+  );
+  const seen = new Set<string>();
+
+  // 第一遍：全部校验（fail loud，不产生任何副作用）
+  const parsed: Array<{ fieldName: string; src: string }> = [];
+  for (const item of loads) {
+    // 首个 "=" 切分（源路径可能含 "="，不能用 split("=")）
+    const eq = item.indexOf("=");
+    if (eq <= 0) {
+      throw new Error(`--load 参数格式错误：'${item}'。应为 --load <path_field>=<source_file>`);
+    }
+    const fieldName = item.slice(0, eq);
+    const src = item.slice(eq + 1);
+
+    if (seen.has(fieldName)) {
+      throw new Error(`--load 字段 '${fieldName}' 重复出现（同字段只允许一次）`);
+    }
+    seen.add(fieldName);
+
+    const pf = pathFields.get(fieldName);
+    if (!pf) {
+      const legal = [...pathFields.keys()].join(", ") || "（无）";
+      throw new Error(
+        `--load 字段 '${fieldName}' 不在 schema 的 path 类型字段中。合法 path 字段: ${legal}`,
+      );
+    }
+    if (!fieldName.endsWith("_path")) {
+      throw new Error(`--load 字段 '${fieldName}' 不满足 xxx_path 命名约定`);
+    }
+    const pairName = fieldName.replace(/_path$/, "_text");
+    if (!ftsTextFields.some((f) => f.name === pairName)) {
+      throw new Error(
+        `--load 字段 '${fieldName}' 缺少配对的 fts text 字段 '${pairName}'（schema.yaml 需声明 type: text 且 fts: true）`,
+      );
+    }
+    if (!existsSync(src)) {
+      throw new Error(`--load 源文件不存在: ${src}`);
+    }
+    parsed.push({ fieldName, src });
+  }
+
+  // 第二遍：校验全过后统一复制（避免前一条已复制、后一条报错的部分执行状态）
+  for (const { fieldName, src } of parsed) {
+    // 目标路径：meta 已写（含 <slug> 占位符）→ 展开；未写 → 默认 <slug>/<field 去掉 _path>.md
+    const raw = meta[fieldName];
+    let rel = raw !== undefined && raw !== null ? String(raw) : "";
+    if (rel.includes("<slug>")) rel = rel.replace(/<slug>/g, finalSlug);
+    if (!rel) {
+      rel = `${finalSlug}/${fieldName.replace(/_path$/, "")}.md`;
+    }
+
+    const targetAbs = resolve(rootDir, rel);
+    const srcAbs = resolve(src);
+    if (srcAbs !== targetAbs) {
+      mkdirSync(dirname(targetAbs), { recursive: true });
+      copyFileSync(srcAbs, targetAbs);
+      console.log(`>>> --load ${fieldName}: ${srcAbs} → ${rel}`);
+    } else {
+      console.log(`>>> --load ${fieldName}: 源与目标相同，跳过复制`);
+    }
+    // 写回相对路径（正斜杠），保证 db 与库目录可整体搬迁
+    meta[fieldName] = rel.replace(/\\/g, "/");
+  }
+}
+
 // ===== 入库 =====
 
-function ingestOne(kbPath: string, metaPath: string): { slug: string; inserted: boolean; primaryKey: string } {
+function ingestOne(
+  kbPath: string,
+  metaPath: string,
+  loads: string[] = [],
+): {
+  slug: string;
+  inserted: boolean;
+  primaryKey: string;
+  fts: Array<{ name: string; chars: number | null }>;
+} {
   const { rootDir } = resolveKbPath(kbPath);
 
   // 1. 加载 schema / slug rule / meta
@@ -311,9 +422,6 @@ function ingestOne(kbPath: string, metaPath: string): { slug: string; inserted: 
     throw new Error("无法生成 slug：meta.yaml 缺少 slug 字段或 slug_rule 必需字段");
   }
 
-  // v1.5.0 NEW: path/text 自动配对加载 + <slug> 占位符展开
-  applyPathTextAutoload(meta, schema, rootDir, computedSlug);
-
   const primaryTable = schema.collection.primary_table;
   const primaryKey = schema.collection.primary_key ?? "slug";
 
@@ -322,6 +430,8 @@ function ingestOne(kbPath: string, metaPath: string): { slug: string; inserted: 
 
   try {
     // 3. 唯一字段稳定性：DOI 等唯一字段已存在时，沿用旧 slug
+    //    （v1.6.0 上移：先定最终 slug，再做 --load / autoload 等路径相关处理，
+    //     防止重入库时文件落 computedSlug 目录而主键是旧 slug）
     let slug = computedSlug;
     let inserted = true;
 
@@ -349,7 +459,13 @@ function ingestOne(kbPath: string, metaPath: string): { slug: string; inserted: 
       }
     }
 
-    // 5. 建目录 + 写文件
+    // 5. v1.6.0 NEW: --load 外部文件落盘（先于 autoload：autoload 要从 <slug>/ 读内容）
+    applyLoadArgs(meta, schema, loads, rootDir, slug);
+
+    // 6. v1.5.0 path/text 自动配对加载 + <slug> 占位符展开（用最终 slug）
+    applyPathTextAutoload(meta, schema, rootDir, slug);
+
+    // 7. 建目录 + 写文件
     const recordDir = join(rootDir, slug);
     mkdirSync(recordDir, { recursive: true });
     const savedMetaPath = join(recordDir, "meta.yaml");
@@ -388,7 +504,30 @@ function ingestOne(kbPath: string, metaPath: string): { slug: string; inserted: 
     });
     tx();
 
-    return { slug, inserted, primaryKey };
+    // 8. v1.6.0: 入库后主动 checkpoint（在 close 前，数据对任意新连接立即可见）
+    const ck = db.prepare("PRAGMA wal_checkpoint(FULL)").get() as
+      | { busy: number; log: number; checkpointed: number }
+      | undefined;
+    if (ck && ck.busy) {
+      console.warn(
+        ">>> 警告：wal_checkpoint 返回 busy=1（存在并发连接），本次未完成 FULL checkpoint，数据仍在 WAL 中（不影响读取）",
+      );
+    }
+
+    // 9. v1.6.0: 回显 fts 字段长度（主表 content 列长度，供自检；非倒排索引内容量）
+    const ftsFields = (schema.fields.optional ?? []).filter((f) => f.type === "text" && f.fts);
+    const fts: Array<{ name: string; chars: number | null }> = ftsFields.map((f) => {
+      try {
+        const r = db
+          .prepare(`SELECT length(${f.name}) AS len FROM ${primaryTable} WHERE ${primaryKey} = ?`)
+          .get(slug) as { len: number | null } | undefined;
+        return { name: f.name, chars: r?.len ?? null };
+      } catch {
+        return { name: f.name, chars: null };
+      }
+    });
+
+    return { slug, inserted, primaryKey, fts };
   } finally {
     db.close();
   }
@@ -531,6 +670,12 @@ function cleanupMock(kbPath: string): { cleaned: number; dirs: string[] } {
     });
     tx();
 
+    // v1.6.0: 删库事务后同样 checkpoint（早退分支无写入，不需要）
+    const ck = db.prepare("PRAGMA wal_checkpoint(FULL)").get() as { busy: number } | undefined;
+    if (ck && ck.busy) {
+      console.warn(">>> 警告：wal_checkpoint busy=1，本次未完成 FULL checkpoint");
+    }
+
     const dirs: string[] = [];
     console.log(`>>> 已从 db 清理 ${rows.length} 条 mock 数据：`);
     for (const r of rows) {
@@ -564,6 +709,7 @@ function parseArgs(): {
   mockSchemaPath: string | null;
   printSlug: boolean;
   cleanupMock: boolean;
+  loads: string[];
 } {
   let kbPath: string | null = null;
   let metaPath: string | null = null;
@@ -571,11 +717,16 @@ function parseArgs(): {
   let mockSchemaPath: string | null = null;
   let printSlug = false;
   let cleanupMockFlag = false;
+  const loads: string[] = [];
   for (let i = 2; i < process.argv.length; i++) {
     const a = process.argv[i];
     const next = process.argv[i + 1];
     if (a === "--meta" && next) {
       metaPath = resolve(next);
+      i++;
+    } else if (a === "--load" && next) {
+      // v1.6.0: 可多次出现，按 argv 顺序处理（各条目针对不同字段，互相独立）
+      loads.push(next);
       i++;
     } else if (a === "--mock") {
       mock = true;
@@ -591,9 +742,12 @@ function parseArgs(): {
       console.log(`用法: ingest.ts <kb-path> [options]
   <kb-path>              库路径
   --meta <file>         入库指定的 meta.yaml
+  --load <field>=<file>  v1.6.0：把外部文件复制进 <slug>/ 并写回路径字段（可多次；
+                         字段须为 schema 中的 xxx_path 类型且配对 fts text 字段）
   --mock                写入内置 mock meta.yaml（papers schema）并入库（向后兼容）
   --mock --schema <file>  用指定 schema 生成 mock meta.yaml 并入库（改进：适配任意业务）
-  --print-slug          配合 --meta：预校验 + 只打印 slug 后退出（v1.5.0 加预校验）
+  --print-slug          配合 --meta：预校验 + 只打印 slug 后退出（v1.5.0 加预校验；
+                         v1.6.0 附带打印 --load 目标路径，零副作用不复制文件）
   --cleanup-mock        清理 mock 数据（按 slug 模式匹配 test_*_mock_* / mock_*_item）
   --help, -h            本帮助
 `);
@@ -602,7 +756,7 @@ function parseArgs(): {
       kbPath = resolve(a);
     }
   }
-  return { kbPath, metaPath, mock, mockSchemaPath, printSlug, cleanupMock: cleanupMockFlag };
+  return { kbPath, metaPath, mock, mockSchemaPath, printSlug, cleanupMock: cleanupMockFlag, loads };
 }
 
 // ===== 入口（仅在直接运行时执行；被 import 时不执行）=====
@@ -620,8 +774,11 @@ function main(): void {
   } else if (args.mock) {
     const metaPath = writeMockMeta(args.kbPath, args.mockSchemaPath);
     console.log(`>>> mock meta.yaml 写入：${metaPath}`);
-    const { slug, inserted } = ingestOne(args.kbPath, metaPath);
-    console.log(`>>> ${inserted ? "inserted" : "updated"} paper: ${slug}`);
+    const { slug, inserted, primaryKey, fts } = ingestOne(args.kbPath, metaPath);
+    console.log(`>>> ${inserted ? "inserted" : "updated"} ${primaryKey}: ${slug}`);
+    for (const f of fts) {
+      console.log(`>>> fts ${f.name}: ${f.chars === null ? "null" : `${f.chars} chars`} (column length)`);
+    }
     // v1.5.0 NEW: mock 入库后输出清理命令
     console.log(`>>> 警告：mock 数据已入库（${slug}）`);
     console.log(`>>> 清理：bun run scripts/ingest.ts ${args.kbPath} --cleanup-mock`);
@@ -639,11 +796,33 @@ function main(): void {
         );
       }
       const slug = generateSlug(meta, slugRule);
+      // v1.6.0: 预检 --load 目标路径（零副作用：只打印，不复制文件）
+      if (args.loads.length > 0) {
+        const pathFieldNames = new Set(
+          (schema.fields.optional ?? []).filter((f) => f.type === "path").map((f) => f.name),
+        );
+        for (const item of args.loads) {
+          const eq = item.indexOf("=");
+          const fieldName = eq > 0 ? item.slice(0, eq) : item;
+          const src = eq > 0 ? item.slice(eq + 1) : "";
+          const raw = meta[fieldName] !== undefined && meta[fieldName] !== null ? String(meta[fieldName]) : "";
+          let rel = raw.includes("<slug>") ? raw.replace(/<slug>/g, slug) : raw;
+          if (!rel) rel = `${slug}/${fieldName.replace(/_path$/, "")}.md`;
+          const legal = pathFieldNames.has(fieldName) ? "" : "（⚠ 字段不在 schema path 类型中，正式入库将报错）";
+          console.log(`>>> --load 预检 ${fieldName}: ${src} → ${rel}${legal}`);
+        }
+      }
       console.log(slug);
       process.exit(0);
     }
-    const { slug, inserted, primaryKey } = ingestOne(args.kbPath, args.metaPath);
+    const { slug, inserted, primaryKey, fts } = ingestOne(args.kbPath, args.metaPath, args.loads);
     console.log(`>>> ${inserted ? "inserted" : "updated"} ${primaryKey}: ${slug}`);
+    // v1.6.0: fts 字段长度回显（主表 content 列长度，供自检清单核对）
+    for (const f of fts) {
+      console.log(
+        `>>> fts ${f.name}: ${f.chars === null ? "null" : `${f.chars} chars`} (column length)`,
+      );
+    }
   } else {
     console.error("需要 --meta <path> 或 --mock，或 --help");
     process.exit(1);

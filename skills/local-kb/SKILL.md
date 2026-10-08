@@ -4,7 +4,7 @@ slug: local-kb
 description: 本地信息资源数据库的统一执行入口。当用户提出"建一个本地 X 库 / 做一个 Y 档案 / 存一下这篇 Z / 查一下我的 W / 备份"等指令时调用本 skill。Agent 按 SKILL.md 选对应脚本并执行，**所有具体执行都在 scripts/*.ts 中**——agent 不需要再读 SOUL.md 中关于具体执行的章节，也不需要再读具体业务的 papers/ 或 health_records/ 文档。适用于本地文献库、家人健康档案、本地项目档案、本地联系人档案、本地会议纪要、本地学习笔记、本地实验室台账等任何"长期累积 + 检索 + 反查 + 备份"场景。
 compatibility: bun
 author: RoxSzi (SI_Cheng-Yun, 司承运)
-version: 1.5.2
+version: 1.6.0
 license: MulanPSL v2
 ---
 
@@ -66,7 +66,16 @@ cat raw.md | bun run scripts/clean.ts --stdin > clean.md
 
 # mcp fetch 输出（必须加 --from-mcp）
 bun run scripts/clean.ts --stdin --from-mcp < raw-mcp.txt > clean.md
+
+# v1.6.0 锚点截断（在启发式清洗之前执行；indexOf 字面匹配，不含正则）
+bun run scripts/clean.ts raw.md clean.md --trim-head "Laboratory Experiment|" --trim-tail "Article Metrics"
 ```
+
+**--trim-head / --trim-tail（v1.6.0）**：
+- 语义：`--trim-head A` 保留 A 首次出现处（含 A）到末尾；`--trim-tail B` 保留开头到 B 首次出现处（不含 B）截止；双向同给且 A 在 B 之后 → 报错退出。
+- fail loud：锚点未命中 / 区间倒置 → stderr 报错 exit 1，绝不静默跳过（trim 是破坏性操作）。
+- 进度日志走 stderr，stdin 模式下 stdout 管道出口纯净。
+- 适用：出版社页面固定 chrome（ACS 导航头 / 页脚尾）一次截净，免手写一次性 trim 脚本。
 
 ### 2.3 ingest —— 入库
 
@@ -74,8 +83,13 @@ bun run scripts/clean.ts --stdin --from-mcp < raw-mcp.txt > clean.md
 # 入库一条记录
 bun run scripts/ingest.ts <kb-path> --meta <meta.yaml>
 
-# 预校验 + 只算 slug 不入库（v1.5.0+：会跑完整 schema 校验，不用真入库就能发现字段问题）
-bun run scripts/ingest.ts <kb-path> --meta <meta.yaml> --print-slug
+# v1.6.0：直接带外部全文文件入库（自动复制到 <slug>/ 并写回路径字段，免手动
+# print-slug→mkdir→move；完成后自动 checkpoint 并回显 fts 字段长度）
+bun run scripts/ingest.ts <kb-path> --meta <meta.yaml> --load fulltext_path=<全文文件>
+
+# 预校验 + 只算 slug 不入库（v1.5.0+：会跑完整 schema 校验，不用真入库就能发现字段问题；
+# v1.6.0：附带打印 --load 目标路径，零副作用不复制文件）
+bun run scripts/ingest.ts <kb-path> --meta <meta.yaml> --load fulltext_path=<文件> --print-slug
 
 # 自测（入库后输出清理命令）
 bun run scripts/ingest.ts <kb-path> --mock
@@ -91,6 +105,12 @@ bun run scripts/ingest.ts <kb-path> --cleanup-mock
 | 必填字段缺失 | err |
 | 未知字段（不在 schema 白名单）| err（约定大于配置） |
 | 字段类型不匹配 | err |
+
+**--load 约定**（v1.6.0）：
+- 字段准入：必须是 schema 中的 `xxx_path` 类型字段且存在配对的 `xxx_text`(fts:true)，否则报错退出；同字段重复出现报错；先全量校验后统一复制。
+- 目标规则：meta.yaml 已写该字段（含 `<slug>` 占位符）→ 展开后作为目标；未写 → 默认 `<slug>/<field 去 _path>.md`。
+- **推荐 meta.yaml 显式写路径字段**（如 `fulltext_path: <slug>/fulltext.md`），保证 db / meta.yaml / 磁盘三方一致。
+- DOI 等唯一字段已存在时沿用旧 slug，`--load` 文件落在旧 slug 目录（重入库安全）。
 
 **v1.5.0+ path/text 自动配对加载**：schema 同时声明 `xxx_path`（type: path）和 `xxx_text`（type: text, fts:true）时，ingest 自动从 `xxx_path` 读文件填到 `xxx_text`。meta.yaml 显式提供的 `xxx_text` 优先（不被覆盖）。
 
@@ -136,6 +156,8 @@ bun run scripts/query.ts <kb-path> --all
 > 📌 **`--read` 的全文来源**：query.ts 自动探测 `<record-dir>/fulltext.md` / `content.md` / `正文.md` 按需读取。**即使 db.fulltext_text=null，--read 仍能读全文**。
 >
 > 📌 **FTS 与 fulltext_text 的关系**：`--fts` / `--fts-like` 关键词搜索只走 db 的 fts 字段（如 abstract / fulltext_text）。如果某条记录 fts 字段为 null，FTS 搜不到该记录，但 `--read` 仍可读文件。
+>
+> ⚠️ **自写 SQLite 验证脚本的 API 红线（v1.6.0）**：bun:sqlite 的 `db.query(sql, params)` 第二参被**静默忽略**（`?` 保持 NULL，比较恒假，查询恒 0 行无报错）。参数必须传给 `.get(params)` / `.all(params)` / `.run(params)`，不传给 `db.query()` 第二参。验证 FTS 内容优先用 `query.ts --fts-like`，不自写 SQL。
 >
 > 📌 **避免 fulltext_text=null**（v1.5.0+）：schema 声明 `fulltext_path` + `fulltext_text(fts:true)` 配对后，ingest 自动加载全文进 FTS 字段。详见 §2.3。
 
@@ -268,7 +290,7 @@ bun run scripts/audit.ts <kb-path> --check <dim>
 
 | # | 反模式 | 报错位置 |
 |---|---|---|
-| 1 | 不算 slug 就 mkdir | `ingest.ts` 不允许外部预先 mkdir，主键由 slug rule 算 |
+| 1 | 不算 slug 就 mkdir | record 目录由 `ingest.ts` 内部创建（含 v1.6.0 `--load` 自动建目录），agent 不预先 mkdir，主键由 slug rule 算 |
 | 2 | 内容不清理直接入库 | agent 必须先跑 `clean.ts` |
 | 3 | mcp fetch JSON 包装不解包 | `clean.ts --from-mcp` 强制使用 |
 | 4 | 重跑 ingest 当"重新插入" | `ingest.ts` 用 INSERT OR REPLACE，且 DOI 唯一时沿用旧 slug |
@@ -334,7 +356,7 @@ grep -E "❓|待核实|未知|____" <kb-path>/<slug>/meta.yaml
 - [ ] meta.yaml 必填字段齐全？
 - [ ] slug 已先 `--print-slug` 再 ingest（v1.5.0+ 预校验）？
 - [ ] 唯一字段查重（DOI / 身份证等）？
-- [ ] **FTS 字段入库后实际有内容**（length > 13，排除 "Test abstract" 等占位；不为 null）？
+- [ ] **FTS 字段入库后实际有内容**：看 ingest 输出的 `>>> fts <field>: N chars (column length)` 回显（v1.6.0+；null 或异常小值即异常）？
 - [ ] path 字段指向的文件实际存在（ingest 会警告）？
 - [ ] 已按 §3 输出格式讲解？
 - [ ] 回归检查：`grep -E "❓|待核实|未知|____"` 无命中？

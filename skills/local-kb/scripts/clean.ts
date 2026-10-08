@@ -6,8 +6,10 @@
  *   bun run scripts/clean.ts --stdin                          # stdin→stdout
  *   bun run scripts/clean.ts --stdin --from-mcp               # stdin 是 mcp 工具的 JSON 包装
  *   cat raw.md | bun run scripts/clean.ts --stdin > clean.md
+ *   bun run scripts/clean.ts raw.md clean.md --trim-head "A" --trim-tail "B"   # v1.6.0 锚点截断
  *
  * 处理内容（按顺序）：
+ *   0. 锚点截断（--trim-head / --trim-tail，在启发式清洗之前执行）
  *   1. 剥 <script>/<style>/<noscript>/<head> 整块
  *   2. 剥 ACS / Wiley / Elsevier 风格的全局导航
  *   3. 删行内残留的 HTML 注释 / iframe / 表格 div
@@ -90,16 +92,66 @@ function unwrapMcpResponse(text: string): string {
   }
 }
 
+/**
+ * v1.6.0 NEW: 锚点截断，在启发式清洗之前执行。
+ *
+ * 为什么在清洗前：clean 的导航规则会整行删除纯 URL 行（如 DOI 链接），
+ * 锚点若被选在会被清洗改动的行上，清洗后 trim 会误报未命中；
+ * clean 不重排内容，前后截断的保留区间等价，清洗前执行还能少洗一段废文本。
+ *
+ * 语义：
+ *   --trim-head A  保留 A 首次出现处（含 A）到末尾
+ *   --trim-tail B  保留开头到 B 首次出现处（不含 B）截止
+ *   双向同给且 A 在 B 之后 → 区间倒置，报错退出
+ *
+ * 匹配用 indexOf 字面匹配（锚点常含正则特殊字符如括号/竖线/点号）；
+ * 未命中或区间倒置 → stderr 报错 exit 1（fail loud，绝不静默跳过——trim 是破坏性操作）；
+ * 进度日志一律走 stderr（stdin 模式下 stdout 是管道出口，不能污染）。
+ */
+function applyTrim(text: string, head: string | null, tail: string | null): string {
+  let start = 0;
+  let end = text.length;
+  if (head !== null) {
+    const i = text.indexOf(head);
+    if (i < 0) {
+      console.error(`>>> --trim-head 锚点未命中: "${head.slice(0, 60)}"`);
+      process.exit(1);
+    }
+    start = i;
+    console.error(`>>> trim-head: 保留自 "${head.slice(0, 40)}"（丢弃前 ${start} chars）`);
+  }
+  if (tail !== null) {
+    const j = text.indexOf(tail);
+    if (j < 0) {
+      console.error(`>>> --trim-tail 锚点未命中: "${tail.slice(0, 60)}"`);
+      process.exit(1);
+    }
+    end = j;
+    console.error(`>>> trim-tail: 截止于 "${tail.slice(0, 40)}"（丢弃后 ${text.length - end} chars）`);
+  }
+  if (start >= end) {
+    console.error(
+      `>>> trim 区间倒置：--trim-head 锚点位置（${start}）在 --trim-tail 锚点位置（${end}）之后`,
+    );
+    process.exit(1);
+  }
+  return text.slice(start, end);
+}
+
 function parseArgs(): {
   input: string | null;
   output: string | null;
   useStdin: boolean;
   fromMcp: boolean;
+  trimHead: string | null;
+  trimTail: string | null;
 } {
   let input: string | null = null;
   let output: string | null = null;
   let useStdin = false;
   let fromMcp = false;
+  let trimHead: string | null = null;
+  let trimTail: string | null = null;
   for (let i = 2; i < process.argv.length; i++) {
     const a = process.argv[i];
     const next = process.argv[i + 1];
@@ -108,14 +160,23 @@ function parseArgs(): {
     else if (a === "--out" && next) {
       output = next;
       i++;
+    } else if (a === "--trim-head" && next) {
+      trimHead = next;
+      i++;
+    } else if (a === "--trim-tail" && next) {
+      trimTail = next;
+      i++;
     } else if (a === "--help" || a === "-h") {
       console.log(`用法: clean.ts <input.md> [output.md] | --stdin
   --stdin                从 stdin 读，输出到 stdout
   --from-mcp             自动识别 mcp 工具返回的 JSON 包装
   --out <path>           显式指定输出路径
+  --trim-head <锚点>     v1.6.0：保留锚点首次出现处（含）到末尾（清洗前执行，indexOf 字面匹配）
+  --trim-tail <锚点>     v1.6.0：保留开头到锚点首次出现处（不含）截止
   --help, -h             本帮助
 
 默认：<input>.cleaned.md
+锚点未命中 / 区间倒置 → stderr 报错 exit 1（fail loud）
 `);
       process.exit(0);
     } else if (!input) {
@@ -124,7 +185,7 @@ function parseArgs(): {
       output = resolve(a);
     }
   }
-  return { input, output, useStdin, fromMcp };
+  return { input, output, useStdin, fromMcp, trimHead, trimTail };
 }
 
 const args = parseArgs();
@@ -132,7 +193,8 @@ const args = parseArgs();
 if (args.useStdin) {
   const text = await Bun.stdin.text();
   const unwrapped = args.fromMcp ? unwrapMcpResponse(text) : text;
-  const cleaned = cleanMarkdown(unwrapped);
+  const trimmed = applyTrim(unwrapped, args.trimHead, args.trimTail);
+  const cleaned = cleanMarkdown(trimmed);
   if (args.output) {
     writeFileSync(args.output, cleaned, "utf-8");
     console.log(`>>> cleaned → ${args.output} (${cleaned.length} chars)`);
@@ -146,7 +208,8 @@ if (args.useStdin) {
   }
   const raw = readFileSync(args.input, "utf-8");
   const unwrapped = args.fromMcp ? unwrapMcpResponse(raw) : raw;
-  const cleaned = cleanMarkdown(unwrapped);
+  const trimmed = applyTrim(unwrapped, args.trimHead, args.trimTail);
+  const cleaned = cleanMarkdown(trimmed);
   const outPath = args.output ?? args.input.replace(/\.md$/, ".cleaned.md");
   writeFileSync(outPath, cleaned, "utf-8");
   const before = unwrapped.length;
