@@ -13,9 +13,9 @@
 <!-- BEGIN: SKILLS-TABLE (auto) -->
 | Skill | 版本 | 触发一句话 | 依赖 |
 |---|---|---|---|
-| [`undefined`](#local-kb) | 1.6.0 | "本地信息资源数据库的统一执行入口" | bun |
-| [`ocr-toolkit`](#ocr-工具箱) | 1.0.2 | "OCR 工具选型与流水线构建" | python |
-| [`undefined`](#tech-brief-writer) | 4.3.0 | "技术简报撰写" | — |
+| [`本地信息资源数据库`](#local-kb) | 1.6.0 | "本地信息资源数据库的统一执行入口" | bun |
+| [`OCR 工具箱`](#ocr-toolkit) | 1.0.2 | "OCR 工具选型与流水线构建" | python |
+| [`技术简报撰写`](#tech-brief-writer) | 4.3.0 | "技术简报撰写" | — |
 <!-- END: SKILLS-TABLE -->
 
 ---
@@ -152,18 +152,18 @@ skills/
 ├── .gitignore
 ├── scripts/                     # 仓库级脚本（pnpm build:index 等）
 └── skills/
-    ├── undefined/
+    ├── 本地信息资源数据库/
     │   ├── scripts/
     │   ├── INTEGRATION_GUIDE.md
     │   ├── SKILL.md
     │   ├── package.json
     │   └── template.md
-    ├── ocr-toolkit/
+    ├── OCR 工具箱/
     │   ├── notes/
     │   ├── scripts/
     │   ├── README.md
     │   └── SKILL.md
-    └── undefined/
+    └── 技术简报撰写/
         ├── LTRS/
         ├── SERDS/
         ├── scripts/

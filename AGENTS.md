@@ -12,9 +12,9 @@
 <!-- BEGIN: SKILLS-OVERVIEW (auto) -->
 | 目录 | Skill | 版本 | 运行时依赖 |
 |---|---|---|---|
-| `skills/undefined/` | local-kb | 1.6.0 | bun |
-| `skills/ocr-toolkit/` | OCR 工具箱 | 1.0.2 | python |
-| `skills/undefined/` | tech-brief-writer | 4.3.0 | — |
+| `skills/本地信息资源数据库/` | local-kb | 1.6.0 | bun |
+| `skills/OCR 工具箱/` | ocr-toolkit | 1.0.2 | python |
+| `skills/技术简报撰写/` | tech-brief-writer | 4.3.0 | — |
 <!-- END: SKILLS-OVERVIEW -->
 
 主仓库：[AtomGit](https://atomgit.com/roxszi/skills)（作者国内主用）
