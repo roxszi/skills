@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{技术名}演示 — 工程化骨架（template.html v4.0.0）</title>
+<title>{技术名}演示 — 工程化骨架（template.html v4.2.0）</title>
 
-<!-- ⚙ 工程化交互演示骨架（template.html）· tech-brief-writer skill v4.0.0
+<!-- ⚙ 工程化交互演示骨架（template.html）· tech-brief-writer skill v4.2.0
      复制本文件 → 重命名为「交互演示.html」→ 替换所有 {占位符}
      ⚙ 复制后请删除所有「⚙」标记的备忘（顶部 + sidebar 备忘）
      完整规范见 SKILL.md §二「工程化样式框架」与「反模式 A-D」
@@ -314,6 +314,8 @@
 
 // ─── CONFIG: 业务常量集中区 ─────────────────────────────────────────────
 // 修改这里调整演示行为；不要把业务常量散落到各 drawPanelX 函数里
+// ⚙ 单位换算常量在此命名化定义（名称写明方向，如 NM_TO_CM = 1e-7），
+//   禁止在表达式里裸写 1e6 / 1e-7；交付断言纪律见 SKILL.md §二「交付断言自检」
 const CONFIG = {
   // 业务数据（如多档激光 / 多个样本 / 多个频率）
   SERIES: [
@@ -384,6 +386,8 @@ function niceTicks(xMin, xMax, targetCount) {
 // 画坐标轴 + 网格 + 标签，返回坐标变换函数 + plotArea
 // 参数 noXTicks=true：跳过 X 网格竖线 + X 刻度文字（用于分类轴，如面板 B 的激光名）
 // 返回值含 plotArea 字段（{top,bottom,left,right} 聚合，供 withClip 使用）
+// ⚠ yLog=true：要求 yMin/yMax > 0（非正值 → log10 → NaN → 网格/刻度静默消失零报错）；全链二选一
+//   （原始数据+yLog 或 预取 log10+线性轴+轴标签标注 10ⁿ）禁止混用；数据正性断言由业务层自测承担
 function drawAxes(ctx, dpr, w, h, xMin, xMax, yMin, yMax, xLabel, yLabel, yLog, noXTicks) {
   const left = 60, right = w - 30, top = 30, bottom = h - 60;
 
@@ -508,6 +512,18 @@ function withClip(ctx, plot, fn) {
   try { fn(); } finally { ctx.restore(); }
 }
 
+// Mulberry32 seeded PRNG（固定 seed，可重现；确定性噪声一律用它，禁止手搓 LCG 参数）
+// 用法见 SKILL.md §二「Canvas 散点可视化反模式」；简并性自检：new Set(values).size >= 0.9 * N 且标准差 > 0
+function mulberry32(seed) {
+  return function () {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = seed;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 
 // 通用折线绘制（使用 drawAxes 返回的 xToPx/yToPx）
 // 可选 plotArea 参数：传入则自动 withClip 包裹，防数据超出坐标轴
@@ -550,6 +566,8 @@ function drawLine(ctx, xData, yData, xToPx, yToPx, opts, plotArea) {
 // =====================================================================
 // 按演示主题替换。参考 SKILL.md §二反模式 A「物理公式简化陷阱」：
 //   占比 / 归一化公式的分子分母不能共用项被约掉，否则会失去对某些参数的响应。
+// ⚙ 前置架构纪律 compute/draw 分离：业务计算收敛为纯函数（入参 params → 出落数据数组），
+//   drawPanelX 只消费数据。没有这一条，交付断言自检的全部断言都退化为只能目验。
 
 
 // 业务公式示例：高斯函数（替换为本演示实际需要的物理公式）
@@ -702,6 +720,85 @@ requestAnimationFrame(() => {
 CONFIG.SLIDER_IDS.forEach(id => {
   document.getElementById(id).addEventListener("input", updateAll);
 });
+
+
+// =====================================================================
+// 自测块：交付断言自检（SKILL.md §二「交付断言自检」）
+// 断言随交付物走：全部通过只打一行 console 汇总，失败在页面插警示条。
+// ⚙ 交付前：把 SKIP 的示例断言替换为按本演示业务编写的断言清单，
+//   console 须 0 FAIL / 0 SKIP 才可交付；禁止直接删除本块。
+// ⚙ compute* 纯函数在入口层挂 globalThis.COMPUTE_EXPORTS = { computeXxx, ... }（verify-interaction.mjs
+//   优先据此发现函数；vm 顶层 const 箭头函数不进全局对象，不挂则壳只能扫描 function 声明）。
+// ⚠ 断言函数须同步返回 true / false / "skip"，返回 Promise 会计为 FAIL。
+// =====================================================================
+function __assertClose(actual, expected, relTol, label, absTol) {
+  // expected≈0 时 relTol×|expected| 退化为 0，可传 absTol 兜底（与 verify-interaction.mjs assertClose 同构）
+  const ok = Math.abs(actual - expected) <= Math.max(relTol * Math.abs(expected), absTol || 0);
+  if (!ok) console.error("[自测失败] " + label + ": 实际 " + actual + " 期望 " + expected + " (relTol " + relTol + ")");
+  return ok;
+}
+function __assertTrue(cond, label) {
+  if (!cond) console.error("[自测失败] " + label);
+  return !!cond;
+}
+function __assertFiniteArray(arr, label) {
+  return __assertTrue(Array.isArray(arr) && arr.length > 0 && arr.every(Number.isFinite), "NaN/Infinity 零容忍: " + label);
+}
+
+function runSelfTests() {
+  const fails = [], skips = [];
+  const t = (label, fn) => {
+    try {
+      const r = fn();
+      if (r === "skip") skips.push(label);
+      else if (r !== true) fails.push(label);
+    } catch (e) { fails.push(label + " (异常: " + e.message + ")"); }
+  };
+
+  // 示例 1｜真值恢复断言：最小二乘斜率恢复已知真值（开箱即跑，验证自测机制本身）
+  t("真值恢复:回归斜率恢复已知参数", () => {
+    const slopeTrue = 2.0;
+    const xs = [1, 2, 3, 4, 5];
+    const ys = xs.map(x => slopeTrue * x);
+    const mx = xs.reduce((a, b) => a + b, 0) / xs.length;
+    const my = ys.reduce((a, b) => a + b, 0) / ys.length;
+    const slope = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0)
+      / xs.reduce((s, x) => s + (x - mx) ** 2, 0);
+    return __assertClose(slope, slopeTrue, 1e-9, "斜率");
+  });
+
+  // 示例 2｜两端方向断言（⚙ 未接业务 compute 返回 skip；实现 compute/draw 分离后，
+  //          替换为本演示关键曲线的两端方向断言，参考 SKILL.md 断言触发表）
+  t("方向:曲线两端方向", () => {
+    if (typeof computePanelA !== "function") return "skip";
+    const lo = computePanelA({ ...CONFIG.DEFAULT_PARAMS, param1: 0 });
+    const hi = computePanelA({ ...CONFIG.DEFAULT_PARAMS, param1: 100 });
+    // 内容比较只是下限；真实断言须编码声明方向（如 hi 峰高 > lo 峰高），见 SKILL.md 断言触发表
+    return __assertTrue(JSON.stringify(hi) !== JSON.stringify(lo), "param1 两端曲线输出应不同(方向按业务声明)");
+  });
+
+  // 示例 3｜NaN 零容忍（⚙ 未接业务 compute 返回 skip；实现后替换为本演示全部绘制数据序列）
+  t("NaN 零容忍:绘制数据全有限", () => {
+    if (typeof computePanelA !== "function") return "skip";
+    return __assertFiniteArray(computePanelA(CONFIG.DEFAULT_PARAMS), "panelA 数据");
+  });
+
+  if (fails.length === 0 && skips.length === 0) {
+    console.log("[自测] 全部 PASS ✓");
+  } else {
+    if (skips.length > 0) console.warn("[自测] " + skips.length + " 项 SKIP(未接业务 compute): " + skips.join("; "));
+    if (fails.length > 0) {
+      console.error("[自测] " + fails.length + " 项失败: " + fails.join("; "));
+      const bar = document.createElement("div");
+      bar.style.cssText = "position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#b71c1c;color:#fff;padding:8px 16px;font:13px system-ui";
+      bar.textContent = "⚠ 自测失败 " + fails.length + " 项: " + fails.join("; ");
+      document.body.appendChild(bar);
+    }
+  }
+  return fails.length === 0;
+}
+
+runSelfTests();
 </script>
 
 </body>

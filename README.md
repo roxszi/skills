@@ -13,9 +13,9 @@
 <!-- BEGIN: SKILLS-TABLE (auto) -->
 | Skill | 版本 | 触发一句话 | 依赖 |
 |---|---|---|---|
-| [`local-kb`](#本地信息资源数据库) | 1.6.0 | "本地信息资源数据库的统一执行入口" | bun |
+| [`undefined`](#local-kb) | 1.6.0 | "本地信息资源数据库的统一执行入口" | bun |
 | [`ocr-toolkit`](#ocr-工具箱) | 1.0.2 | "OCR 工具选型与流水线构建" | python |
-| [`undefined`](#tech-brief-writer) | 4.1.3 | "技术简报撰写" | — |
+| [`undefined`](#tech-brief-writer) | 4.2.0 | "技术简报撰写" | — |
 <!-- END: SKILLS-TABLE -->
 
 ---
@@ -152,7 +152,7 @@ skills/
 ├── .gitignore
 ├── scripts/                     # 仓库级脚本（pnpm build:index 等）
 └── skills/
-    ├── local-kb/
+    ├── undefined/
     │   ├── scripts/
     │   ├── INTEGRATION_GUIDE.md
     │   ├── SKILL.md
@@ -166,6 +166,7 @@ skills/
     └── undefined/
         ├── LTRS/
         ├── SERDS/
+        ├── scripts/
         ├── SKILL.md
         ├── template.html
         └── template.md

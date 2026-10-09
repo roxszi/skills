@@ -2,7 +2,7 @@
 name: tech-brief-writer
 description: 技术简报撰写。为某项技术/方法/仪器原理撰写"可存档技术简报"时使用。产出"MD 简报 + 可选交互式 HTML 演示"双件套。当用户说"写个技术简报""帮我把 XX 技术整理成备忘""看一下这篇文章用的技术并存档"等表述时触发。本 skill 定义了简报的目录规范、11 章节模板（含独立术语表与参考文献章节）、技术依赖处理规则、图/公式/算例要求、交互演示规格、诚实性红线与交付前自检清单。配套：`template.md`（MD 骨架）+ `template.html`（HTML 工程化骨架）双模板。
 author: RoxSzi (SI_Cheng-Yun, 司承运)
-version: 4.1.3
+version: 4.2.0
 license: MulanPSL v2
 ---
 
@@ -228,8 +228,9 @@ function mulberry32(seed) {
   };
 }
 // 页面加载时一次性预生成固定偏移（不在重绘里调用 Math.random）
-const SCATTER_OFFSETS = Array.from({length: N},
-  () => (mulberry32(SEED)() - 0.5) * range);
+// ⚠ 一个 PRNG 实例连续取数；不要在回调里重复 mulberry32(SEED)()（同 seed 同首值，N 个偏移全部相同）
+const rand = mulberry32(SEED);
+const SCATTER_OFFSETS = Array.from({ length: N }, () => (rand() - 0.5) * range);
 ```
 
 **重绘原则**：位置用 `SCATTER_OFFSETS[i]`（稳定），噪声幅度用确定性方向 × 当前 `noiseSigma`（来自滑块）。
@@ -338,6 +339,42 @@ const aFrac = A / (A + B);                       // = 1/(1+D)，只依赖 D
 - 对数坐标轴的数据跨越多个数量级
 - 归一化数据的尾部超出显示范围
 
+### 交付断言自检（交互演示必做）
+
+> 交互演示的 silent bug（无报错但行为错）目验抓不全。本节纪律与 [`template.html`](template.html) 的 `runSelfTests()` 自测骨架配套：**断言随交付物走**，浏览器打开读 console 即验证，零新依赖；宿主无浏览器工具时可用 [`scripts/verify-interaction.mjs`](scripts/verify-interaction.mjs) 在 Node 侧跑数据层断言。
+
+#### 前置架构纪律：compute / draw 分离
+
+业务计算全部收敛为**纯函数**（入参 params、出落数据数组），`drawPanelX` 只消费数据、不含业务公式。没有这一条，下表全部断言退化为只能目验；有了它，断言可在无 DOM 环境直接跑。compute* 纯函数在入口层显式挂 `globalThis.COMPUTE_EXPORTS = { computeXxx, ... }`——`verify-interaction.mjs` 优先据此发现函数（vm 顶层 const 箭头函数不进全局对象）。
+
+#### 断言触发表（看到场景 → 必做）
+
+| 触发场景 | 必做断言 / 动作 |
+|:---|:---|
+| **数据进入绘制前** | NaN / Infinity 零容忍：数据序列过 `every(Number.isFinite)`——Canvas 对 NaN 坐标静默断线 / 空白、零报错（log 轴负值、除零、负数开方、单位换算错位都是来源） |
+| **交付前联调** | 先声明**控件 × 面板响应矩阵**（每格标「响应 / 无响应 + 方向」，控件含滑块 / 下拉 / 按钮 / 档位切换），再逐格断言：响应格输出按声明变化，**无响应格断言输出不变**（抓「滑块误伤无关面板」的过度耦合） |
+| **回归 / 拟合 / 单位换算** | **真值恢复断言**：合成数据 + 已知参数，断言恢复值落在容差带（合成无噪声时相对误差 ≤ 1%）；换算常量**命名化**（如 `const NM_TO_CM = 1e-7`，名称写明方向），禁止裸写 `1e6` |
+| **单调 / 趋势曲线** | **两端方向断言** `f(xMax)` vs `f(xMin)`（防 sigmoid 指数正负号反）；非全局单调曲线（共振峰）退化为分段方向声明 + 峰位随参数移动方向 |
+| **迭代类算法（LM / 阻尼）** | **端到端参数恢复**：合成数据用 seeded PRNG（复用 mulberry32），断言恢复参数（容差 1~5%）**+ 收敛标志**（迭代次数 < maxIter，防「没收敛但容差擦线通过」） |
+| **投影 / 谱解 / 矩阵公式** | 在**非对角一般谱输入**上做精度断言（对角 / 单位阵输入会漏掉范数因子）；自包含验证用**往返重建**（投影 → 逆变换 → 逼近原输入）或解析小案例手算值 |
+| **确定性噪声** | 不手搓 LCG 参数，直接复用 template `mulberry32` 已知良好常量；生成后**简并性自检**：`new Set(values).size >= 0.9 * N` 且标准差 > 0（与生成器实现无关，能抓哈希碰撞 / seed=0 / 常数折叠） |
+| **log 轴** | **二选一全链一致**：原始数据 + `yLog=true`，或预取 log10 + 线性轴 + 轴标签标注 10ⁿ，**禁止混用**；log 轴数据先断言全为正值（`Math.log10(0/负值)` → NaN → 线段凭空消失），或有显式钳位策略 |
+| **每条断言书写** | 显式设定自己的全部输入状态（首选从 `CONFIG.DEFAULT_PARAMS` 出发改起），断言之间**零顺序耦合**；滑块边界（min / max / step 两端）各推一次，除零 / 越界只在边界暴露 |
+| **面板标注数值** | insight 框 / 面板上的数字一律由**同一 compute 路径**产出，禁止手写字面量（防「图动了数字没动」） |
+
+#### HTML 拼装自检（提取管线三重断言）
+
+拼装 / 改写 HTML 后跑提取验证时，`node --check` 只保语法不保行为（行为级验证 = 上表响应矩阵断言），空输入会假通过。三重断言（参考实现见 `scripts/verify-interaction.mjs`）：
+
+1. `<script` 与 `</script>` **开闭计数相等**（直击「漏收尾标签 → 提取 0 字符」根因）；
+2. 提取内容**锚点符号全命中**（按演示实际函数名单定，如 `CONFIG` / `SLIDER_IDS` / `updateAll` / `drawAxes`）；
+3. 提取长度 > 500 字符（只防「提取到空气」；**不设绝对大阈值**——小演示合法 6~8KB，绝对阈值误伤且拦不住错误内容）。
+
+#### 内嵌自测骨架（template.html 已封装）
+
+`runSelfTests()` 在页面加载末尾自动运行：全部通过只打一行 console 汇总，未接业务 compute 的示例断言显式报 SKIP（**不静默假绿**），失败才在页面插警示条。交付前浏览器打开一次读 console，确认 **0 FAIL / 0 SKIP**（与「交付前自测」目验环节合并做）；禁止直接删除本块。
+
+---
 #### Agent 行为约束（工具优先级，强约束）
 
 > 违反时 agent 应自我反思——**用户觉得不需要 = 我大概率在过度工程**。
@@ -764,6 +801,7 @@ const code = `flowchart TD
 - [ ] **§二·niceTicks 浮点尾巴**：坐标轴标签均过 `toFixed(decimals)`，无 `2.0000000003` 这类长尾？
 - [ ] **§二·数据 clip**（数据范围可能超出显示时）：`drawLine` 已传 `plotArea` / 自定义绘制已用 `withClip` 包裹？（详见 §二 反模式 D）
 - [ ] **§二·物理公式简化陷阱**：占比 / 归一化公式分子分母有共用项被约掉？node 模拟验证每个滑块（含 ΔQ、λ_max、Γ 等）都响应？
+- [ ] **§二·交付断言自检**：`runSelfTests()` console **0 FAIL / 0 SKIP**？响应矩阵已声明并逐格断言（含无响应格）？提取管线三重断言已过？详见 §二「交付断言自检」。
 - [ ] **§二·「⚙」标记的备忘清理**：sidebar / hint 区块无"💡 桌面端 sticky..."这类「⚙」标记的备忘？`template.html` 顶部的「⚙」标记块已删除？
 - [ ] **§二·Footer 模板**：三要素齐全 + Skill 链接未被改写（固定 `https://atomgit.com/roxszi/skills`）+ `target="_blank" rel="noopener"`？
 - [ ] **§二·面板数扩展验证**：`template.html` 默认演示 2 面板，扩展为 3+ 面板时**验证栅格布局**（`.demo-app` 的 `grid-template-columns` 在新面板数下还能正确对齐 + sticky 不堆叠）？
@@ -786,3 +824,5 @@ const code = `flowchart TD
 | :-- | :-- | :-- |
 |  skill 同目录下的 `LTRS/` 目录 | **复杂技术（多原理交叉）的范式** | 灵魂锚点的提炼方式、技术变体章节（§6）、依赖地图（§11）的完整结构 |
 | skill 同目录下的 `SERDS/` 目录 | **单一核心机理（双波长差分）的范式** | 一句话锚点（坐标对偶性表）、关键概念的简洁呈现、参考文献分类排列（§10） |
+
+> ⚠️ 范式简报早于「交付断言自检」纪律落地（不含 `runSelfTests()` 自测块），不作为自检形态范例；断言纪律以 §二「交付断言自检」为准。
