@@ -2,7 +2,7 @@
 name: tech-brief-writer
 description: 技术简报撰写。为某项技术/方法/仪器原理撰写"可存档技术简报"时使用。产出"MD 简报 + 可选交互式 HTML 演示"双件套。当用户说"写个技术简报""帮我把 XX 技术整理成备忘""看一下这篇文章用的技术并存档"等表述时触发。本 skill 定义了简报的目录规范、11 章节模板（含独立术语表与参考文献章节）、技术依赖处理规则、图/公式/算例要求、交互演示规格、诚实性红线与交付前自检清单。配套：`template.md`（MD 骨架）+ `template.html`（HTML 工程化骨架）双模板。
 author: RoxSzi (SI_Cheng-Yun, 司承运)
-version: 4.2.0
+version: 4.3.0
 license: MulanPSL v2
 ---
 
@@ -135,9 +135,11 @@ license: MulanPSL v2
 > 💡 **MD 骨架模板（template.md）**：本 skill 同目录下的 [`template.md`](template.md) 与上述 11 章节列表 **1-to-1 对齐**，以 `{占位符}` 形式给出可直接套用的空白简报结构。
 > 
 > **推荐工作流**：
-> 1. 复制 `template.md` → 重命名为 `技术简报.md`
-> 2. 按 §一 顺序，逐章替换 `{占位符}` 内容
-> 3. 按需裁剪可选章节（目录 / 技术变体 §6 / 数据处理算法 §7 等）
+> 1. **动笔前先通读** `template.md` 与 `template.html` 全文（确认章节结构 / 样式类 / JS 工具集真实存在），不凭印象默写；范式简报（附录 A）至少通读一份对应类型
+> 2. 复制 `template.md` → 重命名为 `技术简报.md`
+> 3. 按 §一 顺序，逐章替换 `{占位符}` 内容；**格式基线 = 模板与范式样例**（章节层级 / 表格用法 / 图片引用语法 / 引用格式），不以“更紧凑 / 更整洁”为由自作主张改结构
+> 4. 按需裁剪可选章节（目录 / 技术变体 §6 / 数据处理算法 §7 等）
+> 5. **长简报分两次 write**：第一次写 yaml + §1–§5，第二次 append 余下章节——`write` 单次超限会静默截断
 > 4. 完成后走 §五 自检清单
 
 > 💡 **HTML 骨架模板（template.html）**：本 skill 同目录下的 [`template.html`](template.html) 提供 6 class 样式框架（`demo-*`）+ JS 工具集（`initCanvas` / `niceTicks` / `drawAxes` / `ResizeObserver`）+ CONFIG 集中区 + Footer 三要素，可作为新交互演示的起点。
@@ -160,6 +162,8 @@ license: MulanPSL v2
 **满足以下任一即必须生成**：① 至少 1 个滑块能改变谱形/几何/信号；② 演示能体现 §3.2 灵魂锚点的对比视图（"正确 vs 错误"、"A vs B" 等）；③ 演示能让读者"看到某个 trade-off 怎么动"；④ 核心机理涉及多参数协同。
 
 **满足以下任一即可省略**：① 技术核心无"参数 → 信号形态"因果链；② 是 SOP 或制备方法；③ 核心是单点公式或常数表；④ 用 Mermaid + SVG 已能完整传达全部原理。
+
+**升级判定**：已按 SVG 路线动笔后，若交互参数达 4 个以上 → 停止扩写 SVG，升级为 HTML 交互演示（SVG 只适合静态示意图 + 少量文字标注）。
 
 ### 技术要求
 
@@ -392,6 +396,11 @@ const aFrac = A / (A + B);                       // = 1/(1+D)，只依赖 D
 2. 缺的是真能力还是"我以为缺的能力"？
 3. 造工具的成本（额外脚本 + 一个端口 + 一个清理步骤）vs 收益是什么？
 
+### 审阅分工（有多 Agent 环境时）
+
+- 交互 HTML 完成后，派工程向 Agent 审阅：只出报告（坐标 / 裁剪调用 / 公式分子分母 / 全滑块 × 全面板联动路径），**不修改文件**；撰写 Agent 拍板后自己改。
+- 领域 / 物理正确性 = 撰写 Agent 终责：协作者报告只覆盖工程问题，物理公式错误（如算错推导路径、误用经验参数）由撰写 Agent 最后核对。
+
 ---
 
 ## 三、配套细化规范
@@ -484,6 +493,7 @@ DOI / URL 给定
    - 文字标注用绝对像素坐标 + `text-anchor="middle/end"`，**不靠字符宽度对齐**。
 4. **脚本存档 & 生成方式**：
    - 脚本存档命名：`scripts/generate-xx.{html,mjs,ts}`（**首选 `.html`**，理由见目录规范 callout）
+   - **含文字标注 / 几何位置的 SVG**：先用计算工具输出全部 (x, y) 坐标表再写路径，复杂几何从循环生成的 `points[i]` 取，不心算角度
    - **几何 / 示意 SVG**：手写即可（参考 LTRS 的 `assets/optical-path.svg`）
    - **数据驱动 SVG**：D3.js（天然输出 SVG DOM，零配置）或 echarts（需设置输出 SVG 而非 canvas）
    - **避免 Python matplotlib / Origin / gnuplot**：浏览器 / 手机 / 平板 / GitHub preview 上无法直接复现
@@ -731,6 +741,8 @@ const code = `flowchart TD
   python -c "import math; print(math.cos(math.radians(30)))"
   ```
   适合：多维矩阵、信号处理、统计等场景。**注意**：Python 一行需要 `import math`，比 Node / Bun 的 `Math.cos(...)` 多一步；因此**简单算式场景倾向 Node / Bun**。
+
+**验证脚本留档**：多行验证脚本存到简报目录 `scripts/verify-*.mjs`，不跑完即删；复杂验证需 jsdom 模拟时 `pnpm add -D jsdom` 留在工作区（依赖留仓复用）。
 
 ### 4.3 通用触发式自查清单（看到就触发）
 

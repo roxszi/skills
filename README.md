@@ -15,7 +15,7 @@
 |---|---|---|---|
 | [`undefined`](#local-kb) | 1.6.0 | "本地信息资源数据库的统一执行入口" | bun |
 | [`ocr-toolkit`](#ocr-工具箱) | 1.0.2 | "OCR 工具选型与流水线构建" | python |
-| [`undefined`](#tech-brief-writer) | 4.2.0 | "技术简报撰写" | — |
+| [`undefined`](#tech-brief-writer) | 4.3.0 | "技术简报撰写" | — |
 <!-- END: SKILLS-TABLE -->
 
 ---

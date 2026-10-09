@@ -14,7 +14,7 @@
 |---|---|---|---|
 | `skills/undefined/` | local-kb | 1.6.0 | bun |
 | `skills/ocr-toolkit/` | OCR 工具箱 | 1.0.2 | python |
-| `skills/undefined/` | tech-brief-writer | 4.2.0 | — |
+| `skills/undefined/` | tech-brief-writer | 4.3.0 | — |
 <!-- END: SKILLS-OVERVIEW -->
 
 主仓库：[AtomGit](https://atomgit.com/roxszi/skills)（作者国内主用）
