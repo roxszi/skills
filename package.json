@@ -2,7 +2,7 @@
   "name": "roxszi-skills",
   "version": "1.0.0",
   "private": true,
-  "description": "AI 编程 agent 可调用的 skills 集合 — 仓库级元数据维护（自动同步 README / AGENTS）。各 skill 自身的 package.json 见 skills/<slug>/package.json（如 local-kb）。",
+  "description": "AI 编程 agent 可调用的 skills 集合 — 仓库级元数据维护（自动同步 README / CONTRIBUTING）。各 skill 自身的 package.json 见 skills/<name>/package.json（如 local-kb）。",
   "scripts": {
     "build:index": "tsx scripts/build-index.ts",
     "build:index:dry": "tsx scripts/build-index.ts --dry-run",

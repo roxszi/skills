@@ -2,7 +2,7 @@
 /**
  * pre-commit hook 专用检查脚本。
  *
- * 职责：检查 README.md / AGENTS.md 的 sentinel 区间是否与 skills 下各 SKILL.md 的
+ * 职责：检查 README.md / CONTRIBUTING.md 的 sentinel 区间是否与 skills 下各 SKILL.md 的
  * frontmatter 一致。如果不一致 → exit 1，挡住 commit。
  *
  * 与 build-index.ts 的关系：
@@ -19,13 +19,14 @@ import { join } from "node:path";
 import {
   loadSkills,
   renderSkillsTable,
+  renderSkillLinks,
   renderOverviewTable,
   renderDirTree,
 } from "./build-index";
 
 const REPO_ROOT = process.cwd();
 const README_PATH = join(REPO_ROOT, "README.md");
-const AGENTS_PATH = join(REPO_ROOT, "AGENTS.md");
+const CONTRIBUTING_PATH = join(REPO_ROOT, "CONTRIBUTING.md");
 
 /** 从文件中提取 sentinel BEGIN/END 之间的内容（trim 后） */
 function extractSentinel(filePath: string, key: string): string | null {
@@ -55,13 +56,14 @@ function main() {
 
   const checks: Check[] = [
     { file: "README.md", key: "SKILLS-TABLE", expected: renderSkillsTable(skills) },
+    { file: "README.md", key: "SKILL-LINKS", expected: renderSkillLinks(skills) },
     { file: "README.md", key: "DIR-TREE", expected: renderDirTree(skills) },
-    { file: "AGENTS.md", key: "SKILLS-OVERVIEW", expected: renderOverviewTable(skills) },
+    { file: "CONTRIBUTING.md", key: "SKILLS-OVERVIEW", expected: renderOverviewTable(skills) },
   ];
 
   let failed = 0;
   for (const c of checks) {
-    const fullPath = c.file === "README.md" ? README_PATH : AGENTS_PATH;
+    const fullPath = c.file === "README.md" ? README_PATH : CONTRIBUTING_PATH;
     const current = extractSentinel(fullPath, c.key);
     const expectedTrim = c.expected.trim();
     if (current === null) {
@@ -93,7 +95,7 @@ function main() {
 
   if (failed > 0) {
     console.error("\n❌ " + failed + " 处不一致，commit 被阻止");
-    console.error("   修复：跑 pnpm build:index 后重新 git add README.md AGENTS.md");
+    console.error("   修复：跑 pnpm build:index 后重新 git add README.md CONTRIBUTING.md");
     process.exit(1);
   }
   console.log("\n✨ 全部一致，commit 放行");

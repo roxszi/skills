@@ -2,8 +2,8 @@
 /**
  * 仓库级 index 维护脚本。
  *
- * 职责：扫描 skills 下各 SKILL.md 的 YAML frontmatter，把 README.md / AGENTS.md
- * 中标记为「自动渲染」区间的硬事实（版本号 / slug / 触发场景 / 目录结构）
+ * 职责：扫描 skills 下各 SKILL.md 的 YAML frontmatter，把 README.md / CONTRIBUTING.md
+ * 中标记为「自动渲染」区间的硬事实（版本号 / 显示名 / 触发场景 / 目录结构 / 链接安装）
  * 一次性同步成与 SKILL.md 一致的最新值。
  *
  * 叙事性描述、技术细节、段落正文 → 不动，保留人工写作意图。
@@ -17,6 +17,7 @@
  *   - loadSkills()
  *   - firstSentence(desc)
  *   - renderSkillsTable(skills)
+ *   - renderSkillLinks(skills)
  *   - renderOverviewTable(skills)
  *   - renderDirTree(skills)
  *   - replaceSentinel(filePath, key, newContent)
@@ -27,9 +28,10 @@
  *   <!-- END: SKILLS-TABLE -->
  *
  * 可用区间（section 名 = BEGIN/END 注释里的 KEY）：
- *   - SKILLS-TABLE  → README.md 的「Skills 总览」表
- *   - SKILLS-OVERVIEW → AGENTS.md 的「仓库概述」表
- *   - DIR-TREE         → README.md 的「目录结构」块（按真实 ls 渲染）
+ *   - SKILLS-TABLE   → README.md 的「Skills 总览」表
+ *   - SKILL-LINKS    → README.md 的「链接安装」清单
+ *   - DIR-TREE       → README.md 的「目录结构」块（按真实 ls 渲染）
+ *   - SKILLS-OVERVIEW → CONTRIBUTING.md 的「仓库概述」表
  */
 
 import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
@@ -40,7 +42,9 @@ import { join } from "node:path";
 const REPO_ROOT = process.cwd();
 const SKILLS_DIR = join(REPO_ROOT, "skills");
 const README_PATH = join(REPO_ROOT, "README.md");
-const AGENTS_PATH = join(REPO_ROOT, "AGENTS.md");
+const CONTRIBUTING_PATH = join(REPO_ROOT, "CONTRIBUTING.md");
+// 链接安装清单的 GitHub base（owner/repo 是仓库级常量，非 skill 名，允许硬编码）
+const GITHUB_BASE = "https://github.com/roxszi/skills/blob/main/skills";
 
 // ============== Markdown 字符常量 ==============
 //
@@ -80,13 +84,11 @@ function fence(): string {
 // ============== 标题锚点 slugify ==============
 //
 // 模拟 GitHub [html-pipeline](https://github.com/jch/html-pipeline) 锚点算法，
-// 用于从 SKILL.md 主标题 `## <emoji> <name>`（去掉 slug 与破折号的简化格式）生成
-// README 表格里的链接锚点。
+// 用于生成 README「Skills 总览」表的锚点：锚点 = slugify(README 详情章节标题文本)。
 //
-// **架构决策（2026-07-13）**：之前的标题格式 `## \`slug\` — <name>` 因为 slug 和
-// 破折号的存在，导致不同平台（GitHub / AtomGit / GitLab）的锚点算法产生不同结果。
-// 现在统一改为 `## <emoji> <name>` 的纯中文标题，slug 移到表格第一列展示。
-// 标题文本 = `emoji + 空格 + 中文名`，跨平台处理高度一致（汉字保留 / emoji 删 / 空格变 -）。
+// **约定（2026-10-21）**：README 详情章节标题 = frontmatter `slug` 字段（中文显示名，
+// 缺省回落 name）——标题与锚点同源，同一文本跑同一算法，恒一致不断链。
+// 跨平台（GitHub / AtomGit / GitLab）处理高度一致：汉字保留 / emoji 删 / 空格变 -。
 
 /**
  * 把任意文本转为 GitHub 标题锚点兼容的 slug。
@@ -186,7 +188,8 @@ export function loadSkills(): SkillInfo[] {
     }
     const meta = parseFrontmatter(skillMd);
     out.push({
-      slug: meta.slug,
+      // slug = 中文显示名（frontmatter 可选字段），缺省回落 name；README 表格 / 链接文本 / 锚点用它
+      slug: meta.slug || meta.name,
       name: meta.name,
       version: meta.version,
       description: meta.description,
@@ -226,33 +229,21 @@ export function firstSentence(desc: string, maxLen = 80): string {
 /**
  * 渲染 README.md 的「Skills 总览」表 — 含跨平台锚点链接。
  *
- * **锚点格式**：`#${slugify(name)}`——直接对 frontmatter 的 `name` 字段做 slugify，
- * 不拼 slug / 不用 fakeTitle。
- *
- * 为什么这么简洁？README 标题格式已统一改为 `## <emoji> <name>`（2026-07-13 架构调整）：
- *   - 之前：`## 📚 \`local-kb\` — 本地信息资源数据库` —— 含 slug + 中文破折号
- *   - 现在：`## 📚 本地信息资源数据库` —— 仅 emoji + 中文名
- *
- * 收益：
- *   - **跨平台一致**：汉字 / emoji 在 GitHub / AtomGit / GitLab 处理完全一致
- *     （汉字保留、emoji 删、空格→-）
- *   - **slug 信息不丢失**：表格第一列 `` `local-kb` `` 仍展示 slug，目录结构树里也清晰可见
- *   - **脚本简化**：去掉 fakeTitle 构造逻辑，slugify() 直接对 name 跑就行
- *   - **永远不踩平台差异坑**：未来平台升级算法也不会影响（锚点 ID 完全由 name 决定）
+ * **锚点格式**：`#${slugify(displayName)}`，displayName = slug 字段（中文显示名，缺省 name）。
+ * README 详情章节标题与锚点同源（见 slugify 上方约定），恒一致不断链。
  *
  * 注意点：
- * - **不嵌版本号**——主标题不带版本号，硬塞会让每次升版本都要改链接
- * - **name 中的空格自动变 `-`**——例如 `name: OCR 工具箱` → `#ocr-工具箱`
- *   （slugify 内置空格 → `-` 步骤）
- * - **大写自动转小写**——`name: OCR 工具箱` → `#ocr-工具箱`（slugify 内置 toLowerCase）
+ * - **不嵌版本号**——标题不带版本号，硬塞会让每次升版本都要改链接
+ * - **显示名中的空格自动变 `-`**、**大写自动转小写**（slugify 内置）
+ * - 链接文本用 code 样式包裹显示名
  */
 export function renderSkillsTable(skills: SkillInfo[]): string {
   const lines: string[] = [];
   lines.push("| Skill | 版本 | 触发一句话 | 依赖 |");
   lines.push("|---|---|---|---|");
   for (const s of skills) {
-    // 锚点直接对 name 做 slugify（不含 # 前缀），跨平台一致
-    const anchor = "#" + slugify(s.name);
+    // 锚点对显示名（slug 字段，缺省 name）做 slugify（不含 # 前缀），与章节标题同源
+    const anchor = "#" + slugify(s.slug);
     const link = mdLink(code(s.slug), anchor);
     lines.push(
       "| " + link + " | " + s.version + " | " +
@@ -263,14 +254,24 @@ export function renderSkillsTable(skills: SkillInfo[]): string {
   return lines.join("\n");
 }
 
-/** AGENTS.md 的「仓库概述」表 — 简版，无锚点 */
+/**
+ * 渲染 README 的「链接安装」清单 — 各 skill 的 GitHub SKILL.md 直链。
+ * 链接文本 = 显示名（slug）；URL 用 name（真实目录名）。
+ */
+export function renderSkillLinks(skills: SkillInfo[]): string {
+  return skills
+    .map((s) => "- " + mdLink(s.slug, GITHUB_BASE + "/" + s.name + "/SKILL.md"))
+    .join("\n");
+}
+
+/** CONTRIBUTING.md 的「仓库概述」表 — 简版，无锚点 */
 export function renderOverviewTable(skills: SkillInfo[]): string {
   const lines: string[] = [];
   lines.push("| 目录 | Skill | 版本 | 运行时依赖 |");
   lines.push("|---|---|---|---|");
   for (const s of skills) {
-    // 用 code() 把路径包成 `` `skills/<slug>/` ``，鼠标悬停可看到等宽字体的完整路径
-    lines.push("| " + code("skills/" + s.slug + "/") + " | " + s.name + " | " + s.version + " | " + s.compatibility + " |");
+    // 目录列用 name（真实目录名）；Skill 列用显示名（slug）
+    lines.push("| " + code("skills/" + s.name + "/") + " | " + s.slug + " | " + s.version + " | " + s.compatibility + " |");
   }
   return lines.join("\n");
 }
@@ -279,19 +280,19 @@ export function renderOverviewTable(skills: SkillInfo[]): string {
 export function renderDirTree(skills: SkillInfo[]): string {
   const lines: string[] = [];
   lines.push(fence());  // 围栏代码块起始 ```（避免子目录里有 markdown 标记被误解析）
-  lines.push("skills/");
-  lines.push("├── LICENSE                      # 木兰宽松许可证 v2");
-  lines.push("├── README.md                    # 本文件（自动渲染 Skills 总览）");
-  lines.push("├── AGENTS.md                    # 仓库维护者指南（自动渲染仓库概述）");
-  lines.push("├── .gitignore");
-  lines.push("├── scripts/                     # 仓库级脚本（pnpm build:index 等）");
+  lines.push("AI-Skills/");
+  lines.push("├── CONTRIBUTING.md        ← 仓库维护指南（SKILLS-OVERVIEW 自动渲染）");
+  lines.push("├── README.md              ← 本文件（三个自动区间）");
+  lines.push("├── LICENSE                ← 木兰宽松许可证 v2");
+  lines.push("├── skills.sh.json         ← skills.sh 网站展示配置");
+  lines.push("├── scripts/               ← 仓库级脚本（pnpm build:index 等）");
   lines.push("└── skills/");
   for (let i = 0; i < skills.length; i++) {
     const s = skills[i];
     const isLast = i === skills.length - 1;
     const prefix = isLast ? "    └── " : "    ├── ";
     const subEntries = listSubDir(s.dirName);
-    lines.push(prefix + s.slug + "/");
+    lines.push(prefix + s.name + "/");
     for (let j = 0; j < subEntries.length; j++) {
       const e = subEntries[j];
       const subLast = j === subEntries.length - 1;
@@ -382,7 +383,12 @@ export function runBuild() {
   console.log(renderDirTree(skills));
   console.log("---");
 
-  console.log("\n📝 AGENTS.md 的 SKILLS-OVERVIEW:");
+  console.log("\n📝 README.md 的 SKILL-LINKS:");
+  console.log("---");
+  console.log(renderSkillLinks(skills));
+  console.log("---");
+
+  console.log("\n📝 CONTRIBUTING.md 的 SKILLS-OVERVIEW:");
   console.log("---");
   console.log(renderOverviewTable(skills));
   console.log("---");
@@ -404,16 +410,22 @@ export function runBuild() {
     console.warn("   ⚠️ 未找到 DIR-TREE sentinel，跳过");
   }
 
-  console.log("\n📝 写入 AGENTS.md ...");
-  if (replaceSentinel(AGENTS_PATH, "SKILLS-OVERVIEW", renderOverviewTable(skills))) {
+  if (replaceSentinel(README_PATH, "SKILL-LINKS", renderSkillLinks(skills))) {
+    console.log("   ✅ 链接安装清单 已更新");
+  } else {
+    console.warn("   ⚠️ 未找到 SKILL-LINKS sentinel，跳过");
+  }
+
+  console.log("\n📝 写入 CONTRIBUTING.md ...");
+  if (replaceSentinel(CONTRIBUTING_PATH, "SKILLS-OVERVIEW", renderOverviewTable(skills))) {
     console.log("   ✅ 仓库概述表 已更新");
   } else {
     console.warn("   ⚠️ 未找到 SKILLS-OVERVIEW sentinel，跳过");
   }
 
   console.log("\n✨ 完毕。下一步：");
-  console.log("   git diff README.md AGENTS.md  # 检查渲染结果");
-  console.log("   git add README.md AGENTS.md");
+  console.log("   git diff README.md CONTRIBUTING.md  # 检查渲染结果");
+  console.log("   git add README.md CONTRIBUTING.md");
   console.log("   git commit -m 'docs: 自动同步 skills/ 元数据'");
 }
 

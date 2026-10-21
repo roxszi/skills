@@ -8,13 +8,13 @@
       "skills": ["local-kb"]
     },
     {
-      "title": "🔍 OCR 与文档处理",
-      "description": "中文 OCR + PDF 扫描件识别。基于 Python rapidocr-onnxruntime + pymupdf + pdfplumber 单栈流水线，体检报告 / 病历 / 发票 / 书籍通用。",
-      "skills": ["ocr-toolkit"]
+      "title": "📄 文献精读与综述",
+      "description": "文献精读与方法学审查（速览／精读两档，提取与审查强制分离，硬伤／存疑／缺失分级）+ 批量文献调研与综述成文流水线（元数据核验 → 合规下载 → 并行精读 → 引用校验闭环）。",
+      "skills": ["paper-methodology-audit", "paper-review-writer"]
     },
     {
       "title": "📝 技术写作",
-      "description": "技术简报撰写 + 可选交互式 HTML 演示。15 章节硬性模板，含依赖地图规则（防教学法漂移），重点支持物理 / 化学 / 光谱 / 计量学等交叉域。",
+      "description": "技术简报撰写 + 可选交互式 HTML 演示。11 章节硬性模板，含依赖地图规则（防教学法漂移），重点支持物理 / 化学 / 光谱 / 计量学等交叉域。",
       "skills": ["tech-brief-writer"]
     }
   ]

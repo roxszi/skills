@@ -1,6 +1,8 @@
 ---
 name: paper-review-writer
+slug: 文献调研与综述
 description: 批量文献调研与综述成文流水线：元数据核验→合规下载→全文提取→并行精读条目→素材包→综述写作→引用校验。当用户要求「调研某方向」「把这几年的文献梳理成一篇综述」「批量读这批文献写个综述」「做个调研报告」等主题驱动的多篇调研任务时使用。
+compatibility: node ≥ 22.13
 author: RoxSzi (SI_Cheng-Yun, 司承运)
 version: 0.1.2
 license: MulanPSL v2
