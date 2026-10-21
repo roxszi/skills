@@ -1,10 +1,10 @@
 ---
 name: local-kb
 slug: 本地信息资源数据库
-description: 本地信息资源数据库的统一执行入口。当用户提出"建一个本地 X 库 / 做一个 Y 档案 / 存一下这篇 Z / 查一下我的 W / 备份"等指令时调用本 skill。Agent 按 SKILL.md 选对应脚本并执行，**所有具体执行都在 scripts/*.ts 中**——agent 不需要再读 SOUL.md 中关于具体执行的章节，也不需要再读具体业务的 papers/ 或 health_records/ 文档。适用于本地文献库、家人健康档案、本地项目档案、本地联系人档案、本地会议纪要、本地学习笔记、本地实验室台账等任何"长期累积 + 检索 + 反查 + 备份"场景。
+description: 本地信息资源数据库的统一执行入口。当用户提出"建一个本地 X 库 / 做一个 Y 档案 / 存一下这篇 Z / 查一下我的 W / 备份 / 对账体检"等指令时调用本 skill。适用于本地文献库、家人健康档案、本地项目档案、本地联系人档案、本地会议纪要、本地学习笔记、本地实验室台账等任何"长期累积 + 检索 + 反查 + 备份"场景。
 compatibility: bun
 author: RoxSzi (SI_Cheng-Yun, 司承运)
-version: 1.6.0
+version: 1.7.0
 license: MulanPSL v2
 ---
 
@@ -27,17 +27,18 @@ license: MulanPSL v2
 > | 你的处境 | 读哪个文件 |
 > |---|---|
 > | 日常执行 setup / ingest / query / related / backup | 只读本文件（SKILL.md） |
-> | 首次接入 skill、定义新业务的 schema | 读 `template.md`（通用字段模板 + 接入流程 + SOUL 声明模板） |
-> | 把 skill 部署到项目、精简现有 SOUL、迁移已有库、排查故障 | 读 `INTEGRATION_GUIDE.md`（架构 + 部署 + 迁移 + 故障 + 通用踩坑） |
-> | meta.yaml 写错字段名、字段类型不匹配、查询不到记录 | 先看本文件 §4 反模式 + §6 自检清单；不行再读 `INTEGRATION_GUIDE.md §7 故障排查` |
+> | 首次接入 skill、定义新业务的 schema | 读 `template.md`（通用字段模板 + 接入流程 + 宿主声明模板） |
+> | 把 skill 部署到项目、精简宿主指令文件、迁移已有库、排查故障 | 读 `references/integration-guide.md`（架构 + 部署 + 迁移 + 故障 + 通用踩坑） |
+> | 查版本历史 | 读 `CHANGELOG.md` |
+> | meta.yaml 写错字段名、字段类型不匹配、查询不到记录 | 先看本文件 §4 反模式 + §6 自检清单；不行再读 `references/integration-guide.md` §7 故障排查 |
 >
-> **本文件不重复的内容**（已分别在 template.md / INTEGRATION_GUIDE.md）：
+> **本文件不重复的内容**（已分别在 template.md / references/integration-guide.md）：
 > - 通用字段类型 / 修饰符 / transform 语法 → `template.md §1 / §4`
 > - 业务别名 query_aliases 配置 → `template.md §2`
 > - Agent 接入 skill 的标准流程 → `template.md §8`
-> - SOUL.md 声明模板 → `template.md §9`
-> - 通用踩坑清单 → `INTEGRATION_GUIDE.md §5`
-> - 三层架构 / 部署 / SOUL 精简 / 迁移 → `INTEGRATION_GUIDE.md §0 / §3 / §4 / §6`
+> - 宿主指令文件声明模板 → `template.md §9`
+> - 通用踩坑清单 → `references/integration-guide.md §5`
+> - 三层架构 / 部署 / 宿主指令文件精简 / 迁移 → `references/integration-guide.md §0 / §3 / §4 / §6`
 
 ---
 

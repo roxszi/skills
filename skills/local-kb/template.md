@@ -1,15 +1,11 @@
-# temp-template.md — local-kb skill 通用接入指南（草稿 v1）
+# local-kb skill 通用接入指南
 
 > **定位**：Agent 接入 local-kb skill 的通用指导。任何 Agent 读完后应能：
 > 1. 理解本 skill 的三层架构（通用执行层 / 业务对接层 / 业务定义层）
-> 2. 按"标准接入流程"完成建库 + SOUL 声明
+> 2. 按"标准接入流程"完成建库 + 宿主指令文件声明
 > 3. 把业务专属内容叠加在通用骨架上
 >
-> **不指定业务**：本文件不含"学术文献 / 健康档案 / 项目"等具体业务模板。具体业务定义由 Agent 自己写进 `schema.yaml` 或 SOUL。
->
-> **本文件来源**：从 `C:/Users/siche/AppData/Roaming/CherryStudio/Data/Skills/local-kb/template.md`（437 行）重组精简——保留通用部分，删除 6 种业务示例，新增 Agent 接入流程。
->
-> **状态**：v1 草稿，待用户拍板后整合到 skill 正式 template.md（或改名 / 分拆）。
+> **不指定业务**：本文件不含"学术文献 / 健康档案 / 项目"等具体业务模板。具体业务定义由使用方写进 `schema.yaml` 与宿主指令文件。
 
 ---
 
@@ -20,13 +16,14 @@
 │ skill 通用执行层（不感知 Agent 业务）                          │
 │  - SKILL.md        ：触发判断 + 命令速查 + 反模式 + 自检清单  │
 │  - template.md     ：通用 schema 模板 + 接入流程（本文件）    │
+│  - references/     ：集成指南等按需加载的深度资料             │
 │  - scripts/*.ts    ：setup / clean / ingest / query / ...    │
 └─────────────────────────────────────────────────────────────┘
                             ▲
-                            │  Agent 在 SOUL.md 声明"我用 skill 管 X 业务"
+                            │  Agent 在宿主指令文件中声明"我用 skill 管 X 业务"
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Agent SOUL（业务对接层）                                      │
+│ 宿主指令文件（业务对接层；CLAUDE.md / AGENTS.md / SOUL.md 等）  │
 │  - 数据管理章节：用户意图 → skill 动作 映射                    │
 │  - 业务 schema 字段速览                                       │
 │  - 业务专属入库工作流（叠加在 skill 通用骨架上）                │
@@ -51,9 +48,9 @@
 |---|---|---|
 | 命令格式、参数约束、反模式 | skill SKILL.md | 其他 Agent 也会用 |
 | 字段类型、transform 语法、必填原则 | skill template.md（本文件） | 通用 schema 设计 |
-| "我用 skill 管理化学文献" + 用户意图 → 动作 映射 | Agent SOUL | Agent 业务专属 |
+| "我用 skill 管理化学文献" + 用户意图 → 动作 映射 | 宿主指令文件 | 宿主业务专属 |
 | 业务 schema 字段、必填项 | `<kb>/schema.yaml` | 业务定义 |
-| 业务专属经验（如 ACS 抓全文、孕检报告 OCR） | Agent FACT.md | 只在 Agent 业务场景遇到 |
+| 业务专属经验（如 ACS 抓全文、孕检报告 OCR） | 宿主侧知识文件 | 只在宿主业务场景遇到 |
 
 ---
 
@@ -89,7 +86,7 @@ modifiers:
 
 ## 2. 业务别名 query_aliases
 
-业务方可选地在 `schema.yaml` 里声明 `query_aliases` 节，让 SOUL / Agent / 用户能用业务友好的 flag（`--doi`、`--author`、`--tag`、`--year` 等）替代通用命令。skill 脚本的 parseArgs 会自动翻译成对应的 `--field` / `--like` / `--json` / `--pk` 等模式。
+业务方可选地在 `schema.yaml` 里声明 `query_aliases` 节，让宿主指令文件 / Agent / 用户能用业务友好的 flag（`--doi`、`--author`、`--tag`、`--year` 等）替代通用命令。skill 脚本的 parseArgs 会自动翻译成对应的 `--field` / `--like` / `--json` / `--pk` 等模式。
 
 ```yaml
 query_aliases:
@@ -286,9 +283,9 @@ fulltext_text: |
 bun run <skill>/scripts/setup.ts <kb-path> --schema <kb-path>/schema.yaml
 ```
 
-### 8.3 第三步：SOUL.md 声明使用 skill
+### 8.3 第三步：宿主指令文件声明使用 skill
 
-**直接复制 §9 的 SOUL 声明模板**，按你的业务填：
+**直接复制 §9 的宿主声明模板**，按你的业务填：
 
 1. 数据管理章节（用户意图 → skill 动作 映射）
 2. 业务 schema 字段速览
@@ -321,9 +318,9 @@ bun run <skill>/scripts/setup.ts <kb-path> --schema <kb-path>/schema.yaml
 
 ---
 
-## 9. SOUL.md 声明模板（**核心新增，直接复制粘贴**）
+## 9. 宿主指令文件声明模板（直接复制粘贴）
 
-把下面整段复制到 Agent 的 SOUL.md，按需修改：
+把下面整段复制到宿主指令文件（CLAUDE.md / AGENTS.md / SOUL.md，按宿主叫法），按需修改：
 
 ```markdown
 ## N. 数据管理（走 local-kb skill）
@@ -385,24 +382,9 @@ bun run <skill>/scripts/setup.ts <kb-path> --schema <kb-path>/schema.yaml
 
 ---
 
-## 11. 通用踩坑 / 经验（**Agent 共享，所有用本 skill 的 Agent 必读**）
+## 11. 通用踩坑 / 经验
 
-| # | 踩坑 | 修法 | 触发场景 |
-|---|---|---|---|
-| 1 | **meta.yaml 字段名不在 schema.yaml 白名单** | ingest.ts 直接 err（**约定大于配置**） | 入库 / 重新 ingest |
-| 2 | **mcp fetch 输出是 JSON 包装**（`[{type,text}]`） | `clean.ts --from-mcp` 触发 unwrap | 抓全文后入库 |
-| 3 | **Bash `[rtk]` hook 注入污染 stdin** | `clean.ts` 走文件→文件模式 | 清洗脚本 |
-| 4 | **YAML 含 `:` 字符的字段必须加引号**（url / path / doi） | `url: "https://..."` | 写 meta.yaml |
-| 5 | **WAL 模式下新连接看不到刚 ingest 的行** | 跑 `PRAGMA wal_checkpoint(FULL)` | ingest 后必跑 |
-| 6 | **business 库实际 db 文件名 ≠ 默认 kb.db** | 必须传完整 .db 文件路径或 cd 到库目录 | query / related |
-| 7 | **不跑 `--print-slug` 就 ingest** | slug 可能跟想象的目录名不一致 | 入库前必跑 |
-| 8 | **重跑 ingest 不会重新插入**——DOI 不变则沿用旧 slug | 这是设计而非 bug | 重新 ingest |
-| 9 | **唯一字段变更导致 slug 漂移** | unique_fields 在 schema 里固定下来不要轻易改 | schema 维护 |
-| 10 | **json mode 查询必须传完整字段名**（不是别名） | `--json tags_json --value X` 不是 `--json tags --value X` | query |
-| 11 | **FTS5 中文检索体验差**（unicode61 tokenizer 不分词） | 用 `--fts-like "中文关键词"`（跨字段 LIKE） | 中文查询 |
-| 12 | **path 字段相对路径基准是 rootDir（kb 目录）**（v1.5.0+） | 写 `<slug>/fulltext.md`，不要写 `papers/<slug>/fulltext.md`（前缀会重复） | 写 meta.yaml path 字段 |
-| 13 | **想让 FTS 搜到全文，schema 要配对声明 path+text**（v1.5.0+） | 见 §7.1，配对后 ingest 自动加载 | schema 设计 |
-| 14 | **mock 数据入库后没有自动清理**（v1.5.0 前） | `--cleanup-mock` 一键清理；旧版本手动 `DELETE FROM ... WHERE slug LIKE 'test_%_mock_%'` | 自测入库后 |
+踩坑清单统一收敛在 [`references/integration-guide.md` §5](references/integration-guide.md)（单一正本，防两处漂移）；schema 设计相关约定（path/text 配对、rootDir 相对路径基准）见本文件 §7.1。
 
 ---
 
@@ -410,7 +392,7 @@ bun run <skill>/scripts/setup.ts <kb-path> --schema <kb-path>/schema.yaml
 
 | 本文件章节 | 对应 skill 文件章节 |
 |---|---|
-| §0 三层架构 | SKILL.md §0（待补） / README.md（待写） |
+| §0 三层架构 | SKILL.md §1 / references/integration-guide.md §0 |
 | §1 字段类型 / 修饰符 | db.ts / yaml.ts 实现 |
 | §2 query_aliases | db.ts loadAliases / setup.ts generateSlugRuleJson / query.ts + related.ts parseArgs |
 | §3 最小配置 | SKILL.md §2.1 |
@@ -418,30 +400,7 @@ bun run <skill>/scripts/setup.ts <kb-path> --schema <kb-path>/schema.yaml
 | §5 unique_fields | ingest.ts 唯一字段稳定性逻辑 |
 | §6 必填原则 | ingest.ts 校验逻辑 |
 | §7 fts 原则 | db.ts searchFts / setup.ts FTS5 表生成 |
-| §8 接入流程 | SKILL.md §1 触发判断（重写为更清晰） |
-| §9 SOUL 声明模板 | 无（新增） |
+| §8 接入流程 | SKILL.md §1 触发判断 |
+| §9 宿主声明模板 | 本文件正本 |
 | §10 回归检查 | SKILL.md §6 |
-| §11 踩坑 / 经验 | 无（新增） |
-| §12 引用关系 | 本节 |
-
-> 📌 **改本文件时同步检查 SKILL.md / README.md / scripts/**——三者必须一致。
-
----
-
-## 13. 元说明（仅给本次重构审阅用）
-
-**本文件 vs 现有 skill/template.md 的关系**：
-
-| 现有 skill/template.md 章节 | 处理 |
-|---|---|
-| §0 字段类型与修饰符 | → 本文件 §1（保留） |
-| §0.5 业务别名 | → 本文件 §2（保留） |
-| §1 最小可工作配置 | → 本文件 §3（保留骨架，去业务色彩） |
-| §2.1-2.6 不同业务示例（文献 / 健康 / 项目 / 联系人 / 笔记 / 台账） | **删除**——业务定义由各 Agent 写在自己的 schema.yaml |
-| §3 transform 语法 | → 本文件 §4（保留） |
-| §4 unique_fields 稳定性 | → 本文件 §5（保留） |
-| §5 必填字段选择原则 | → 本文件 §6（保留并改写为通用原则，不列举业务） |
-| §6 fts 字段选择原则 | → 本文件 §7（保留并改写为通用原则） |
-| §7 schema 自检清单 | → 本文件 §10 通用回归检查（合并） |
-| §8 引用关系 | → 本文件 §12（保留并改写） |
-| **新增** | → 本文件 §0 三层架构 / §8 接入流程 / §9 SOUL 声明模板 / §11 通用踩坑 |
+| §11 踩坑 | references/integration-guide.md §5 |

@@ -4,10 +4,10 @@
  * 重点验证：block scalar 内部行的处理（修复 2026-07-11）。
  * 修复背景：`key: |` 内含 `- item` 行会被旧逻辑误解析为 array。
  *
- * 运行：bun test scripts/yaml.test.ts
+ * 运行：bun test tests/（或在 skill 目录跑 bun test）
  */
 import { test, expect } from "bun:test";
-import { parseYaml } from "./yaml.ts";
+import { parseYaml } from "../scripts/yaml.ts";
 
 test("block scalar 内嵌 `- item` 列表项：应作为字符串保留全部内容", () => {
   const yaml = `notes: |
