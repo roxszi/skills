@@ -1,0 +1,176 @@
+{
+  "id": "paper-methodology-audit-trigger-eval-v1",
+  "created": "2026-10-20",
+  "note": "技能触发评测集。label=positive 表示应加载 paper-methodology-audit；label=negative 表示不应加载（expect.skill 给出应归属的技能或 none）。expect_any 为该条在 description 中应被覆盖的触发词之一，--lexical 模式用。",
+  "queries": [
+    {
+      "id": "P01",
+      "label": "positive",
+      "utterance": "C:\\Users\\me\\Downloads\\paper.pdf 看一下这篇",
+      "expect": { "skill": "paper-methodology-audit" },
+      "expect_any": ["看一下这篇", "看一下"]
+    },
+    {
+      "id": "P02",
+      "label": "positive",
+      "utterance": "帮我精读一下这篇文献",
+      "expect": { "skill": "paper-methodology-audit" },
+      "expect_any": ["精读"]
+    },
+    {
+      "id": "P03",
+      "label": "positive",
+      "utterance": "讲一讲这篇文献",
+      "expect": { "skill": "paper-methodology-audit" },
+      "expect_any": ["讲一讲这篇文献"]
+    },
+    {
+      "id": "P04",
+      "label": "positive",
+      "utterance": "这篇靠谱吗？它的结论站得住吗",
+      "expect": { "skill": "paper-methodology-audit" },
+      "expect_any": ["评估可靠性"]
+    },
+    {
+      "id": "P05",
+      "label": "positive",
+      "utterance": "这篇论文的方法能不能支撑我设计电化学阻抗实验",
+      "expect": { "skill": "paper-methodology-audit" },
+      "expect_any": ["支撑"]
+    },
+    {
+      "id": "P06",
+      "label": "positive",
+      "utterance": "帮我对比这三篇文献的异同，哪篇更可信",
+      "expect": { "skill": "paper-methodology-audit" },
+      "expect_any": ["对比"]
+    },
+    {
+      "id": "P07",
+      "label": "positive",
+      "utterance": "先快速看一眼这篇，给我个大概印象",
+      "expect": { "skill": "paper-methodology-audit" },
+      "expect_any": ["快速看一眼"]
+    },
+    {
+      "id": "P08",
+      "label": "positive",
+      "utterance": "这篇只有 DOI，没有本地文件，你帮我读一下：10.1021/acs.analchem.5b00000",
+      "expect": { "skill": "paper-methodology-audit" },
+      "expect_any": ["DOI"]
+    },
+    {
+      "id": "P09",
+      "label": "positive",
+      "utterance": "帮我评估一下这篇论文的方法学部分",
+      "expect": { "skill": "paper-methodology-audit" },
+      "expect_any": ["方法学"]
+    },
+    {
+      "id": "P10",
+      "label": "positive",
+      "utterance": "D:\\文献\\博士论文.docx 帮我看看",
+      "expect": { "skill": "paper-methodology-audit" },
+      "expect_any": ["docx"]
+    },
+    {
+      "id": "P11",
+      "label": "positive",
+      "utterance": "我要在综述里引用这篇，它的方法学有没有硬伤",
+      "expect": { "skill": "paper-methodology-audit" },
+      "expect_any": ["方法学审查"]
+    },
+    {
+      "id": "P12",
+      "label": "positive",
+      "utterance": "这篇里声称的反应机理链自洽吗",
+      "expect": { "skill": "paper-methodology-audit" },
+      "expect_any": ["机理链"]
+    },
+    {
+      "id": "N01",
+      "label": "negative",
+      "utterance": "羰基伸缩振动峰位一般落在多少？",
+      "expect": { "skill": "none" },
+      "expect_any": []
+    },
+    {
+      "id": "N02",
+      "label": "negative",
+      "utterance": "帮我设计一个电化学阻抗实验方案",
+      "expect": { "skill": "none" },
+      "expect_any": []
+    },
+    {
+      "id": "N03",
+      "label": "negative",
+      "utterance": "这份光谱数据帮我做 PCA 和 PLS 建模",
+      "expect": { "skill": "none" },
+      "expect_any": []
+    },
+    {
+      "id": "N04",
+      "label": "negative",
+      "utterance": "帮我把这段中文润色成英文",
+      "expect": { "skill": "none" },
+      "expect_any": []
+    },
+    {
+      "id": "N05",
+      "label": "negative",
+      "utterance": "写一个关于 SERS 增强机制的技术简报",
+      "expect": { "skill": "tech-brief-writer" },
+      "expect_any": []
+    },
+    {
+      "id": "N06",
+      "label": "negative",
+      "utterance": "把这个 PDF 转成 Word 文档",
+      "expect": { "skill": "office-transform" },
+      "expect_any": []
+    },
+    {
+      "id": "N07",
+      "label": "negative",
+      "utterance": "帮我搜一下近三年电化学领域的高被引文献",
+      "expect": { "skill": "none" },
+      "expect_any": []
+    },
+    {
+      "id": "N08",
+      "label": "negative",
+      "utterance": "解释一下什么是析氢过电位",
+      "expect": { "skill": "none" },
+      "expect_any": []
+    },
+    {
+      "id": "N09",
+      "label": "negative",
+      "utterance": "帮我审一下这个开题报告的逻辑结构",
+      "expect": { "skill": "none" },
+      "expect_any": []
+    },
+    {
+      "id": "N10",
+      "label": "negative",
+      "utterance": "我的仪器报了这个故障码 E-214是什么意思",
+      "expect": { "skill": "none" },
+      "expect_any": []
+    },
+    {
+      "id": "N11",
+      "label": "negative",
+      "utterance": "帮我把这份 Excel 数据画成折线图",
+      "expect": { "skill": "none" },
+      "expect_any": []
+    },
+    {
+      "id": "N12",
+      "label": "negative",
+      "utterance": "综述一下表面增强拉曼在病原体检测方面的研究现状",
+      "expect": { "skill": "none" },
+      "alt_skill": "tech-brief-writer",
+      "expect_any": []
+    }
+  ]
+}

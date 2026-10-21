@@ -1,0 +1,24 @@
+{
+  "title": "调研项目标题（如：SERS 基底电化学制备调研）",
+  "topic": "调研主题",
+  "range": "2020-2026",
+  "papers": [
+    {
+      "id": "01",
+      "title": "英文题名（必填）",
+      "title_zh": "中文题名（可选，精读时补）",
+      "authors": "Author A; Author B",
+      "doi": "10.1xxx/xxxxx",
+      "pmid": null,
+      "pmcid": "PMCxxxxxxxx（无则不填）",
+      "kind": "substrate（分类键，可自定；综述分组用）",
+      "kind_zh": "基底制备",
+      "journal": "期刊名（可留空，verify 自动回填）",
+      "year": 2024,
+      "notes": "入选理由（可选）",
+      "manual_urls": ["{url 或 {url, referer} 对象；出版商拦截时手工给的直链}"],
+      "download_overrides": [],
+      "read_depth": "targeted"
+    }
+  ]
+}

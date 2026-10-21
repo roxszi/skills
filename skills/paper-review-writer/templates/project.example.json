@@ -1,0 +1,13 @@
+{
+  "apis": {
+    "mailto": "你的真实邮箱（Unpaywall 必须真实邮箱才返回数据）"
+  },
+  "compliance": {
+    "allow_third_party": false
+  },
+  "download": {
+    "workers": 4,
+    "max_mb": 60,
+    "timeout": 45
+  }
+}

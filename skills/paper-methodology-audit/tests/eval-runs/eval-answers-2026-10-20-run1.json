@@ -1,0 +1,122 @@
+{
+  "P01": {
+    "load": true,
+    "best_skill": "paper-methodology-audit",
+    "reason": "给出PDF并要求阅读解读"
+  },
+  "P09": {
+    "load": true,
+    "best_skill": "paper-methodology-audit",
+    "reason": "评估论文方法学，属审查模式"
+  },
+  "P12": {
+    "load": true,
+    "best_skill": "paper-methodology-audit",
+    "reason": "针对具体论文审查机理链自洽性"
+  },
+  "P10": {
+    "load": true,
+    "best_skill": "paper-methodology-audit",
+    "reason": "给出docx路径要求解读，未明说要审查"
+  },
+  "P03": {
+    "load": true,
+    "best_skill": "paper-methodology-audit",
+    "reason": "用户明确要求讲解文献，命中技能触发词"
+  },
+  "P04": {
+    "load": true,
+    "best_skill": "paper-methodology-audit",
+    "reason": "质疑可靠性与结论，命中方法学审查"
+  },
+  "P02": {
+    "load": true,
+    "best_skill": "paper-methodology-audit",
+    "reason": "用户明确要求精读文献"
+  },
+  "P08": {
+    "load": true,
+    "best_skill": "paper-methodology-audit",
+    "reason": "给DOI要求精读文献"
+  },
+  "P07": {
+    "load": true,
+    "best_skill": "paper-methodology-audit",
+    "reason": "速览模式，仍走文献精读技能"
+  },
+  "P05": {
+    "load": true,
+    "best_skill": "paper-methodology-audit",
+    "reason": "评估论文方法能否支撑实验设计"
+  },
+  "P11": {
+    "load": true,
+    "best_skill": "paper-methodology-audit",
+    "reason": "询问方法学硬伤，属方法学审查"
+  },
+  "P06": {
+    "load": true,
+    "best_skill": "paper-methodology-audit",
+    "reason": "对比三篇文献并评估可信度"
+  },
+  "N01": {
+    "load": false,
+    "best_skill": "none",
+    "reason": "峰位知识问答，不涉及具体文献"
+  },
+  "N02": {
+    "load": false,
+    "best_skill": "none",
+    "reason": "纯实验方案设计，未涉及具体文献"
+  },
+  "N06": {
+    "load": false,
+    "best_skill": "office-transform",
+    "reason": "格式转换任务，不涉文献精读审查"
+  },
+  "N03": {
+    "load": false,
+    "best_skill": "none",
+    "reason": "光谱建模非文献精读任务"
+  },
+  "N07": {
+    "load": false,
+    "best_skill": "none",
+    "reason": "文献检索，非指定文献精读审查"
+  },
+  "N04": {
+    "load": false,
+    "best_skill": "none",
+    "reason": "仅文本润色，不涉文献审查"
+  },
+  "N05": {
+    "load": false,
+    "best_skill": "tech-brief-writer",
+    "reason": "技术简报写作任务，非文献精读审查"
+  },
+  "N08": {
+    "load": false,
+    "best_skill": "none",
+    "reason": "纯概念问答，不涉及具体文献"
+  },
+  "N09": {
+    "load": false,
+    "best_skill": "none",
+    "reason": "审开题报告逻辑结构，非文献任务"
+  },
+  "N10": {
+    "load": false,
+    "best_skill": "none",
+    "reason": "问仪器故障码，非文献精读"
+  },
+  "N12": {
+    "load": false,
+    "best_skill": "tech-brief-writer",
+    "reason": "无具体文献，属主题综述非单篇审查"
+  },
+  "N11": {
+    "load": false,
+    "best_skill": "none",
+    "reason": "Excel绘图，非文献精读审查"
+  }
+}

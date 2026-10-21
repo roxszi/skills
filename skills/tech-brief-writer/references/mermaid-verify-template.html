@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<!-- Mermaid 渲染验证模板：tech-brief-writer §三·3.5 SOP 专用。
+     用法：复制本文件到临时目录 → 把要验证的 mermaid 块原样粘入 code 变量 →
+     浏览器打开 → 等 3-5 秒 → 读 #out 的 textContent（OK svg_len=N 为通过）。 -->
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+</head>
+<body>
+<div id="out">加载中...</div>
+<script>
+mermaid.initialize({ startOnLoad: false });
+
+// ▼▼▼ 把要验证的 mermaid 块原样粘到下面 code 变量里 ▼▼▼
+const code = `flowchart TD
+    A["源"] --> B["目标"]`;
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+(async () => {
+  try {
+    const { svg } = await mermaid.render('test', code);
+    document.getElementById('out').textContent =
+      'OK svg_len=' + svg.length;
+  } catch (e) {
+    document.getElementById('out').textContent =
+      'FAIL ' + e.message;
+  }
+})();
+</script>
+</body>
+</html>

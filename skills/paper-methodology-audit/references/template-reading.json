@@ -1,0 +1,30 @@
+{
+  "slug": "example-sers-ag-2025",
+  "title_en": "Example title of the paper",
+  "title_zh": "论文中文题名",
+  "journal": "Anal. Chem.",
+  "year": 2025,
+  "doi": "10.1021/acs.analchem.5b00000",
+  "read_status": "full_read",
+  "evidence_pages": ["p3", "p5"],
+  "evidence_figs": ["Fig. 1", "Fig. 3b", "Table 2"],
+  "background_zh": "背景与动机（≤300 字）：领域痛点、为什么需要这项工作。",
+  "question_zh": "核心科学问题（≤200 字）：本文要回答什么。",
+  "system_zh": "化学体系（≤200 字）：分析物 / 基质 / 基底 / 材料。",
+  "method_zh": "方法与关键参数（≤600 字）：机制细节不只罗列名词；仪器、关键条件参数给全。",
+  "spec_evidence_zh": "谱学/数据证据（≤400 字）：特征峰位 + 归属、特征数据，带锚点如 (Fig. 2a)。",
+  "results_zh": "主要结果（≤600 字）：带数值 + 锚点 (p5 / Fig. 3b / Table 2)。",
+  "performance_zh": "性能摘要（≤300 字，可选）：LOD / 线性范围 / 回收率等概述。",
+  "performance_metrics": [
+    { "label": "LOD", "value": "0.8 nM" },
+    { "label": "线性范围", "value": "1 nM – 10 μM" },
+    { "label": "回收率", "value": "96.2%–103.5%" }
+  ],
+  "validation_zh": "方法学验证状态（≤200 字，可选）：ICH Q2 六参数做了哪几个、缺哪几个。",
+  "innovation_zh": "真实创新点（≤300 字）：对比 prior art，别人做到哪、本文多走哪一步。",
+  "limitation_zh": "局限/风险（≤300 字）：作者自认的 + 我看出的，分开表述。",
+  "insight_zh": "对本方课题的启示（≤300 字）：OI 流的 I；无关联则明说无关联。",
+  "tags": ["EC-SERS", "AgNPs", "PLS"],
+  "key_figure": "Scheme 1",
+  "reviewed_at": "2026-10-19"
+}

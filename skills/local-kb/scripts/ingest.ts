@@ -298,6 +298,32 @@ function applyPathTextAutoload(
   }
 }
 
+// ===== v1.6.1 NEW: <slug> 占位符展开泛化到所有 path 字段 =====
+
+/**
+ * 对所有 type:"path" 字段展开 <slug> 占位符（不要求配对 fts text 字段）。
+ *
+ * v1.5.0 的展开逻辑在 applyPathTextAutoload 内，仅覆盖有 path/text 配对的字段；
+ * 无配对的 path 字段（如 pdf_path / notes_path）原样入库，db 里残留 "<slug>" 字面量。
+ * 本函数在 --load 落盘之后、autoload 之前执行，用最终 slug 展开（幂等，autoload 内重复展开无副作用）。
+ */
+function expandSlugPlaceholders(
+  meta: MetaYaml,
+  schema: SchemaYaml,
+  computedSlug: string,
+): void {
+  const pathFields = (schema.fields.optional ?? []).filter((f) => f.type === "path");
+  for (const pf of pathFields) {
+    let pv = meta[pf.name];
+    if (pv === undefined || pv === null) continue;
+    pv = String(pv);
+    if (pv.includes("<slug>")) {
+      meta[pf.name] = pv.replace(/<slug>/g, computedSlug);
+      console.log(`>>> 展开 ${pf.name} 占位符：${meta[pf.name]}`);
+    }
+  }
+}
+
 // ===== v1.6.0 NEW: --load 外部文件落盘 =====
 
 /**
@@ -461,6 +487,9 @@ function ingestOne(
 
     // 5. v1.6.0 NEW: --load 外部文件落盘（先于 autoload：autoload 要从 <slug>/ 读内容）
     applyLoadArgs(meta, schema, loads, rootDir, slug);
+
+    // 5.5 v1.6.1: <slug> 占位符展开泛化到所有 path 字段（含无 fts 配对的，如 pdf_path）
+    expandSlugPlaceholders(meta, schema, slug);
 
     // 6. v1.5.0 path/text 自动配对加载 + <slug> 占位符展开（用最终 slug）
     applyPathTextAutoload(meta, schema, rootDir, slug);

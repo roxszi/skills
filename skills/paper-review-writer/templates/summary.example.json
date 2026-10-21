@@ -1,0 +1,27 @@
+{
+  "id": "01",
+  "title_en": "Highly accurate protein structure prediction with AlphaFold",
+  "title_zh": "AlphaFold 实现高精度蛋白质结构预测",
+  "journal": "Nature",
+  "year": 2021,
+  "doi": "10.1038/s41586-021-03819-2",
+  "read_status": "full_read",
+  "evidence_pages": ["p1", "p3", "p5"],
+  "evidence_figs": ["Fig. 1", "Table 1"],
+  "background_zh": "蛋白质三维结构决定功能但实验解析成本高；从序列直接预测结构是长期难题。（≤300 字）",
+  "question_zh": "无同源模板时能否仅凭氨基酸序列高精度预测三维结构？（≤200 字）",
+  "system_zh": "（领域扩展字段，化学/光谱领域填体系：分析物/基质/基底/材料；非化学文献可删）",
+  "method_zh": "Evoformer 处理 MSA 与残基对表示，三角注意力与循环精化，Structure Module 生成坐标。（≤600 字，仪器/条件/参数给全）",
+  "spec_evidence_zh": "（领域扩展字段，化学/光谱领域填特征峰位/谱学证据，带页码锚点；非化学文献可删）",
+  "results_zh": "CASP14 中位主链精度达实验误差水平，无模板与跨膜蛋白难例显著领先。（≤600 字，带数值与锚点）",
+  "performance_metrics": [
+    { "label": "CASP14 中位 GDT", "value": "约 92.4（GDT_TS）" },
+    { "label": "LOD（化学领域示例）", "value": "0.8 nM" }
+  ],
+  "validation_zh": "（领域扩展字段：方法学验证状态，如 ICH Q2 六参数做了哪几个；非化学文献可删）",
+  "innovation_zh": "以注意力融合 MSA 与结构先验，端到端接近实验精度；对比 prior art 写多走了哪一步。（≤300 字）",
+  "limitation_zh": "对动态构象、复合物预测有限；依赖 MSA 质量。作者自认的与本方看出的分开表述。（≤300 字）",
+  "tags": ["端到端预测", "注意力机制", "公开评测"],
+  "key_figure": "Fig. 1",
+  "reviewed_at": "2026-10-21"
+}

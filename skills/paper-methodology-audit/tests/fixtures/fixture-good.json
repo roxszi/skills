@@ -1,0 +1,30 @@
+{
+  "slug": "example-sers-ag-2025",
+  "title_en": "Example title of the paper",
+  "title_zh": "论文中文题名",
+  "journal": "Anal. Chem.",
+  "year": 2025,
+  "doi": "10.1021/acs.analchem.5b00000",
+  "read_status": "full_read",
+  "evidence_pages": ["p3", "p5"],
+  "evidence_figs": ["Fig. 1", "Fig. 3b", "Table 2"],
+  "background_zh": "背景与动机：表面增强拉曼基底的重现性是制约定量分析的核心痛点，本文提出电化学法制备高密度热点阵列。",
+  "question_zh": "核心科学问题：电化学沉积参数如何决定热点密度与 SERS 定量重现性。",
+  "system_zh": "化学体系：4-MPy 探针分子 / Ag 基底 / 0.1 M KCl 电解液。",
+  "method_zh": "方法：三电极体系下 CV 循环沉积 Ag，扫速 50 mV/s，循环 10 圈；之后 CV 还原脱附清洗界面，乙醇淋洗。关键参数全部来自 (p3) 与 (Fig. 1)。",
+  "spec_evidence_zh": "谱学证据：4-MPy 特征峰 1000 cm-1（环呼吸，a1）与 1096 cm-1（C-S 伸缩，b2）强度比指示取向 (Fig. 2a)。",
+  "results_zh": "主要结果：10 片基底 RSD 6.8%，LOD 0.8 nM (Table 2)；热点密度与沉积圈数正相关 (Fig. 3b, p5)。",
+  "performance_zh": "性能：线性 1 nM–10 μM，回收率 96.2%–103.5%，与 HPLC 对照无显著差异。",
+  "performance_metrics": [
+    { "label": "LOD", "value": "0.8 nM" },
+    { "label": "线性范围", "value": "1 nM – 10 μM" },
+    { "label": "回收率", "value": "96.2%–103.5%" }
+  ],
+  "validation_zh": "方法学验证：专属性 / 线性 / 准确度 / 精密度已做；LOD 报告值但未给 LOQ 与鲁棒性数据。",
+  "innovation_zh": "创新点：把 CV 还原脱附引入 Ag 基底清洗，界面残留比柠檬酸还原法低一个量级；prior art 多为 Au 体系。",
+  "limitation_zh": "局限：作者未做批次间重现性；我看出电解液 Cl- 浓度对形貌的影响未系统排查。",
+  "insight_zh": "对本方课题启示：CV 还原脱附清洗可直接移植到 EC-SERS 基底探针制备线，与骆组 4-MPy/Ag 界面工作衔接。",
+  "tags": ["EC-SERS", "AgNPs", "CV还原脱附"],
+  "key_figure": "Scheme 1",
+  "reviewed_at": "2026-10-19"
+}

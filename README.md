@@ -13,9 +13,9 @@
 <!-- BEGIN: SKILLS-TABLE (auto) -->
 | Skill | 版本 | 触发一句话 | 依赖 |
 |---|---|---|---|
+| [`技术简报撰写`](#tech-brief-writer) | 4.3.0 | "技术简报撰写" | — |
 | [`本地信息资源数据库`](#local-kb) | 1.6.0 | "本地信息资源数据库的统一执行入口" | bun |
 | [`OCR 工具箱`](#ocr-toolkit) | 1.0.2 | "OCR 工具选型与流水线构建" | python |
-| [`技术简报撰写`](#tech-brief-writer) | 4.3.0 | "技术简报撰写" | — |
 <!-- END: SKILLS-TABLE -->
 
 ---
@@ -31,6 +31,8 @@ npx skills add roxszi/skills --skill local-kb
 npx skills add roxszi/skills --skill ocr-toolkit
 npx skills add roxszi/skills --skill tech-brief-writer
 
+
+
 # 全局安装（影响 ~/.claude/skills/ 等，而非项目内）
 npx skills add roxszi/skills --skill local-kb -g -a claude-code
 
@@ -41,6 +43,13 @@ npx skills add roxszi/skills --list
 支持的 agent：`claude-code`、`cursor`、`codex`、`windsurf`、`cline`、`gemini-cli`、`opencode` 等共 60+（详见 [vercel-labs/skills](https://github.com/vercel-labs/skills)）。
 
 > 仓库主同步源：[AtomGit](https://atomgit.com)（自动镜像到 GitHub）。两边的 `owner/repo` 路径不同，**GitHub 上的安装命令才是这条 README 的最终值**。
+
+---
+
+## 链接安装
+
+- 技术简报撰写：`https://github.com/roxszi/skills/blob/main/skills/tech-brief-writer/SKILL.md`
+- 
 
 ---
 

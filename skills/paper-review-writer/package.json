@@ -1,0 +1,14 @@
+{
+  "name": "paper-review-writer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "批量文献调研综述流水线：元数据核验 → 合规下载 → 全文提取 → 并行精读条目 → 素材包 → 综述成文 → 引用校验",
+  "license": "MulanPSL-2.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^6.4.299"
+  }
+}
