@@ -4,7 +4,7 @@ slug: 文献调研与综述
 description: 批量文献调研与综述成文流水线：元数据核验→混合获取（url 优先 + pdf 存档）→全文提取→并行精读条目→素材包→综述写作→引用校验。当用户要求「调研某方向」「把这几年的文献梳理成一篇综述」「批量读这批文献写个综述」「做个调研报告」等主题驱动的多篇调研任务时使用。
 compatibility: node ≥ 22.13
 author: RoxSzi (SI_Cheng-Yun, 司承运)
-version: 0.2.4
+version: 0.2.5
 license: MulanPSL v2
 ---
 
@@ -116,7 +116,11 @@ node scripts/review.mjs init-summaries --project <项目目录>
 
 按清单初始化全部条目模板（`read_status: missing`）。之后每篇条目的产生方式：
 
-**有子会话能力：一次派一篇。** 任务卡要素：
+**有子会话能力：一次派一篇。**
+
+**会话策略：一篇一会话。** 每篇独立 `sessions_spawn(mode="run", cleanup="keep")`，`childSessionKey` 记入派发台账；一篇会话只处理一篇，回收完成后不再复用于其他篇（上下文不跨篇残留）。对该篇返回内容有疑义时，用 `sessions_send(sessionKey=<该篇 childSessionKey>)` 把疑点推回同一会话接续追问，篇内上下文仍在、免重读；疑点解决后继续回收。禁止同一子会话顺序处理多篇。
+
+任务卡要素：
 
 1. 输入 = `digests/{id}.md`（必读）+ `papers_txt/{id}.txt`（仅定向回查，不整读）+ digest 尾部图题索引 + `digests/{id}.figs.md`（需要图意时读）。
 2. 上下文 = 综述核心问题与用户敲定的重点 + 章节骨架 + 本篇 `read_depth`（子会话带着综述问题读；核心问题按主会话对话中的最新意图提炼，不照抄初始问句）。
