@@ -6,7 +6,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { validateMeta, validateSummary } from "../scripts/schema.mjs"
-import { cmdDigest, cmdBrief, cmdMaterial, cmdCheck, cmdValidate, figureIndex } from "../scripts/pipeline.mjs"
+import { cmdAssemble, cmdDigest, cmdBrief, cmdMaterial, cmdCheck, cmdValidate, cmdInitSummaries, figureIndex, figureContexts } from "../scripts/pipeline.mjs"
 import { writeJson, writeText, readText, readJson } from "../scripts/lib.mjs"
 
 const results = []
@@ -26,7 +26,38 @@ const GOOD_SUMMARY = {
   background_zh: "背景", question_zh: "问题", method_zh: "方法", results_zh: "结果",
   innovation_zh: "创新", limitation_zh: "局限",
   tags: ["a", "b", "c"], reviewed_at: "2026-10-21",
+  depth_reassessment: { verdict: "keep", reason: "预判准确" },
 }
+
+/** 完整合规综述 fixture：9 章齐全、局限与未来两章带（综述者判断）、映射节覆盖传入编号（供交付自检各用例变形） */
+function fullReview(ids = ["01", "02", "03"]) {
+  const mapping = ids.map(i => `- [${i}] 文献条目 ${i}`).join("\n")
+  return [
+    "# 调研综述",
+    "## 1. 研究背景与问题定义",
+    "背景正文 [01]。",
+    "## 2. 领域全景与研究方向分类",
+    "全景正文。",
+    "## 3. 代表性方法与技术路线",
+    "方法正文。",
+    "## 4. 关键结果与性能对比",
+    "结果正文。",
+    "## 5. 研究范式演进",
+    "范式正文。",
+    "## 6. 现有局限与挑战",
+    "局限正文（综述者判断）。",
+    "## 7. 未来方向与开放问题",
+    "未来正文（综述者判断）。",
+    "## 8. 对用户研究的相关点",
+    "相关点正文。",
+    "## 9. 文献映射",
+    mapping,
+    "",
+  ].join("\n")
+}
+
+/** 三篇素材包 fixture（与 fullReview 默认映射编号配套） */
+const MATERIAL_3 = "## [01] 甲篇\n- 方法：x\n## [02] 乙篇\n- 方法：y\n## [03] 丙篇\n- 方法：z\n"
 
 /* 1. schema：good 条目 0 error */
 {
@@ -63,6 +94,10 @@ const GOOD_SUMMARY = {
   assert("digest 产出且含方法节", digest.includes("Methods"))
   assert("digest 含图题索引且页码正确", digest.includes("Fig. 1(p3)"))
   assert("digest ≤2600 字符", digest.length <= 2700)
+  const figs = readText(path.join(proj, "digests", "01.figs.md")) || ""
+  assert("figs 上下文含图题后文", figs.includes("Fig. 1") && figs.includes("shows spectra"))
+  const kf = readText(path.join(proj, "digests", "keyfacts.md")) || ""
+  assert("keyfacts 含篇号与方法节片段", kf.includes("### 01") && kf.includes("methods:"))
   fs.rmSync(proj, { recursive: true, force: true })
 }
 /* 6. figureIndex 归一化：Figure 2 与 Fig. 2 同图不重复 */
@@ -76,6 +111,10 @@ const GOOD_SUMMARY = {
   const proj = tmpProj()
   writeJson(path.join(proj, "summaries", "summary_01.json"), GOOD_SUMMARY)
   writeJson(path.join(proj, "summaries", "summary_02.json"), { ...GOOD_SUMMARY, id: "02", read_status: "partial_read", evidence_figs: [] })
+  writeJson(path.join(proj, "summaries", "summary_03.json"), {
+    ...GOOD_SUMMARY, id: "03", read_status: "abstract_only", evidence_pages: [], evidence_figs: [],
+    abstract_en: "A Raman study of paeonol in emulsions.", depth_reassessment: { verdict: "downgrade", reason: "边缘" },
+  })
   cmdBrief(proj)
   const brief = readText(path.join(proj, "digests", "brief.md")) || ""
   assert("brief 含中文阅读深度", brief.includes("部分精读"))
@@ -84,6 +123,7 @@ const GOOD_SUMMARY = {
   const material = readText(path.join(proj, "review-material.md")) || ""
   assert("素材包含好条目", material.includes("[01]"))
   assert("坏条目被素材包拦截", !material.includes("[02]") && material.includes("未通过"))
+  assert("仅摘要条目附摘要节选", material.includes("[03]") && material.includes("paeonol in emulsions"))
   fs.rmSync(proj, { recursive: true, force: true })
 }
 /* 8. check：合法 / 非法 / 代码块与链接剔除 */
@@ -94,7 +134,8 @@ const GOOD_SUMMARY = {
   cmdCheck(proj, {})
   const report1 = readJson(path.join(proj, "review_check.json"))
   assert("非法引用 88 被抓、代码与链接剔除", report1.invalid.length === 1 && report1.invalid[0] === "88" && !report1.invalid.includes("99"))
-  writeText(path.join(proj, "deliverables", "调研综述.md"), "正文 [01] 结论 [01]。")
+  // 完整合规 fixture：新版 ok 收紧为「引用合法 + 章节齐 + 映射齐」，原单行综述不再能 ok=true
+  writeText(path.join(proj, "deliverables", "调研综述.md"), fullReview(["01"]))
   cmdCheck(proj, {})
   const report2 = readJson(path.join(proj, "review_check.json"))
   assert("全合法引用通过", report2.ok === true)
@@ -112,6 +153,110 @@ const GOOD_SUMMARY = {
   fs.rmSync(proj, { recursive: true, force: true })
 }
 
+/* 10. schema：depth_reassessment 二次评估（缺失 warning 分级、verdict 枚举） */
+{
+  const bad = validateSummary({ ...GOOD_SUMMARY, id: "06", depth_reassessment: { verdict: "higher", reason: "x" } })
+  assert("二次评估 verdict 非法报 error", bad.errors.some(e => e.includes("depth_reassessment")))
+  const ok = validateSummary({ ...GOOD_SUMMARY, id: "07", depth_reassessment: { verdict: "downgrade", reason: "边缘文献" } })
+  assert("二次评估合法 0 error 0 相关 warning", ok.errors.length === 0 && !ok.warnings.some(w => w.includes("depth_reassessment")))
+  const obj08 = { ...GOOD_SUMMARY, id: "08" }
+  delete obj08.depth_reassessment
+  const noWarn = validateSummary(obj08)
+  assert("非未获取条目缺二次评估报 warning", noWarn.warnings.some(w => w.includes("depth_reassessment")))
+  const obj09 = { ...GOOD_SUMMARY, id: "09", read_status: "missing", evidence_pages: [], evidence_figs: [] }
+  delete obj09.depth_reassessment
+  const miss = validateSummary(obj09)
+  assert("未获取条目缺二次评估不报", !miss.errors.length && !miss.warnings.some(w => w.includes("depth_reassessment")))
+}
+/* 11. assemble：章节文件拼装 */
+{
+  const proj = tmpProj()
+  writeText(path.join(proj, "deliverables", "sections", "00_结论先行.md"), "# 结论\nA")
+  writeText(path.join(proj, "deliverables", "sections", "01_背景.md"), "# 背景\nB")
+  cmdAssemble(proj, {})
+  const out = readText(path.join(proj, "deliverables", "综述.md")) || ""
+  assert("assemble 按序拼装两章节", out.includes("A") && out.includes("B") && out.indexOf("A") < out.indexOf("B"))
+  fs.rmSync(proj, { recursive: true, force: true })
+}
+
+/* 12. figureContexts：图题首现上下文提取与归一化 */
+{
+  const ctx = figureContexts(["Intro text only.", "3. Results Fig. 1 shows spectra. Good signal."])
+  assert("图题上下文含页码与后文", ctx.length === 1 && ctx[0][0] === "Fig. 1" && ctx[0][1].startsWith("p2:") && ctx[0][1].includes("shows spectra"))
+  const ctx2 = figureContexts(["Scheme 3 overall route.", "compare Fig. 2 data"])
+  assert("多图题各自归一化去重", ctx2.length === 2 && ctx2.some(([k]) => k === "Scheme 3") && ctx2.some(([k]) => k === "Fig. 2"))
+}
+/* 13. init-summaries：摘要回填（新建模板写入 + 已有条目补填） */
+{
+  const proj = tmpProj()
+  writeJson(path.join(proj, "papers_meta.json"), { papers: [{ id: "01", title: "T" }] })
+  writeJson(path.join(proj, "papers_meta.verified.json"), { papers: [{ id: "01", title: "T", verified: { europepmc: { abstract: "An abstract about Raman." } } }] })
+  cmdInitSummaries(proj)
+  const s = readJson(path.join(proj, "summaries", "summary_01.json"))
+  assert("init-summaries 建模板写入 abstract_en", s.abstract_en === "An abstract about Raman.")
+  delete s.abstract_en
+  writeJson(path.join(proj, "summaries", "summary_01.json"), s)
+  cmdInitSummaries(proj)
+  const s2 = readJson(path.join(proj, "summaries", "summary_01.json"))
+  assert("已存在条目补填 abstract_en", s2.abstract_en === "An abstract about Raman.")
+  fs.rmSync(proj, { recursive: true, force: true })
+}
+
+/* 14. check 交付自检：完整合规综述三数组全空 */
+{
+  const proj = tmpProj()
+  writeText(path.join(proj, "review-material.md"), MATERIAL_3)
+  writeText(path.join(proj, "deliverables", "调研综述.md"), fullReview())
+  cmdCheck(proj, {})
+  const report = readJson(path.join(proj, "review_check.json"))
+  assert("完整合规综述自检全过", report.ok === true && report.sections_missing.length === 0 && report.mapping_missing.length === 0 && report.judgment_warnings.length === 0)
+  fs.rmSync(proj, { recursive: true, force: true })
+}
+/* 15. check 交付自检：缺章 FAIL（删第 5 章） */
+{
+  const proj = tmpProj()
+  writeText(path.join(proj, "review-material.md"), MATERIAL_3)
+  writeText(path.join(proj, "deliverables", "调研综述.md"), fullReview().replace("## 5. 研究范式演进\n范式正文。\n", ""))
+  cmdCheck(proj, {})
+  const report = readJson(path.join(proj, "review_check.json"))
+  assert("缺章被抓且 ok=false", report.sections_missing.includes("研究范式演进") && report.ok === false)
+  fs.rmSync(proj, { recursive: true, force: true })
+}
+/* 16. check 交付自检：映射缺编号 FAIL（删 [02] 一行） */
+{
+  const proj = tmpProj()
+  writeText(path.join(proj, "review-material.md"), MATERIAL_3)
+  writeText(path.join(proj, "deliverables", "调研综述.md"), fullReview().replace("- [02] 文献条目 02\n", ""))
+  cmdCheck(proj, {})
+  const report = readJson(path.join(proj, "review_check.json"))
+  assert("映射缺编号被抓且 ok=false", report.mapping_missing.length === 1 && report.mapping_missing[0] === "02" && report.ok === false)
+  fs.rmSync(proj, { recursive: true, force: true })
+}
+/* 17. check 交付自检：判断标注缺失仅 WARN（不拦交付） */
+{
+  const proj = tmpProj()
+  writeText(path.join(proj, "review-material.md"), MATERIAL_3)
+  writeText(path.join(proj, "deliverables", "调研综述.md"), fullReview().replaceAll("（综述者判断）", ""))
+  cmdCheck(proj, {})
+  const report = readJson(path.join(proj, "review_check.json"))
+  const warnOk = report.judgment_warnings.length === 2 && report.judgment_warnings.includes("现有局限与挑战") && report.judgment_warnings.includes("未来方向与开放问题")
+  assert("两章缺判断标注报两条 WARN 且 ok 仍 true", warnOk && report.ok === true)
+  const code = await runCmd(() => cmdCheck(proj, {}))
+  assert("纯 WARN 不设非零退出码", code === 0)
+  fs.rmSync(proj, { recursive: true, force: true })
+}
+/* 18. check 交付自检：optional_sections 豁免裁剪章节 */
+{
+  const proj = tmpProj()
+  writeText(path.join(proj, "review-material.md"), MATERIAL_3)
+  writeJson(path.join(proj, "project.json"), { report: { optional_sections: ["研究范式演进"] } })
+  writeText(path.join(proj, "deliverables", "调研综述.md"), fullReview().replace("## 5. 研究范式演进\n范式正文。\n", ""))
+  cmdCheck(proj, {})
+  const report = readJson(path.join(proj, "review_check.json"))
+  assert("豁免章缺失不再 FAIL 且 ok=true", report.sections_missing.length === 0 && report.ok === true)
+  fs.rmSync(proj, { recursive: true, force: true })
+}
+
 /** 运行一个会自行设置 exitCode 的命令函数，返回进程退出码 */
 async function runCmd(fn) {
   const prev = process.exitCode
@@ -124,4 +269,6 @@ async function runCmd(fn) {
 
 const failed = results.filter(r => !r.ok)
 console.log(`\n${failed.length ? "FAIL" : "ALL PASS"}：${results.length - failed.length}/${results.length} 断言通过`)
-if (failed.length) process.exitCode = 1
+// 退出码统一收口：用例内 cmdCheck 等命令会按 FAIL 场景设置进程级 exitCode（如故意造非法引用、缺章），
+// 直接调用不走 runCmd 包装的用例会泄漏到进程——汇总时无论全过还是有败都显式置值，防历史与未来用例复发
+process.exitCode = failed.length ? 1 : 0

@@ -3,11 +3,17 @@
     "mailto": "你的真实邮箱（Unpaywall 必须真实邮箱才返回数据）"
   },
   "compliance": {
-    "allow_third_party": false
+    "allow_third_party": false,
+    "tier3_allowlist": [],
+    "_说明": "获取渠道四档：①用户自下载；②合法文献传递（发起不阻塞）；③知名权威第三方白名单——条目由项目所有者显式写入即视为持久授权，获取时自动执行，无需逐次问询，建议写入时在台账记日期与依据（如 [\"sci-hub\"]）；④其他第三方——allow_third_party 仅在用户对具体渠道逐次显式授权后开启"
   },
   "download": {
     "workers": 4,
     "max_mb": 60,
     "timeout": 45
+  },
+  "report": {
+    "optional_sections": [],
+    "_说明": "交付自检豁免通道：按模板裁掉某章时把模板章名写入此数组，check 不再对该章缺失报 FAIL（如「对用户研究的相关点」）"
   }
 }

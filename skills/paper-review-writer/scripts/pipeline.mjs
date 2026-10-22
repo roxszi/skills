@@ -49,6 +49,21 @@ export function figureIndex(pages) {
   return [...seen.entries()].map(([k, v]) => `${k}(p${v})`)
 }
 
+/** 图题首现上下文：每个图题在首现页命中处向后取 span 字符——caption 大多紧邻首现处（先见图后文），
+ *  子会话读上下文即可掌握图意（化学 Scheme 的 caption 常完整描述合成路线），无需渲染位图；导出供测试 */
+export function figureContexts(pages, maxFigures = 10, span = 400) {
+  const seen = new Map()
+  pages.forEach((body, i) => {
+    if (seen.size >= maxFigures) return
+    for (const m of body.matchAll(/\b(Fig(?:ure)?\.?|Scheme|Table)\s+(\d+[A-Za-z]?)/gi)) {
+      const word = /^scheme/i.test(m[1]) ? "Scheme" : /^table/i.test(m[1]) ? "Table" : "Fig."
+      const key = `${word} ${m[2]}`
+      if (!seen.has(key)) seen.set(key, `p${i + 1}: ${clean(body.slice(m.index, m.index + span))}`)
+    }
+  })
+  return [...seen.entries()]
+}
+
 /** extract 子命令：全部 PDF → papers_txt/{id}.txt；无 PDF 且有 PMCID 的走 EPMC XML 降级 */
 export async function cmdExtract(root, args) {
   const cfg = loadProject(root)
@@ -160,8 +175,28 @@ export function cmdDigest(root, args) {
     let digest = parts.join("")
     if (digest.length > DIGEST_MAX) digest = digest.slice(0, DIGEST_MAX) + "\n## (truncated)\n"
     writeText(pPath(digDir, `${pid}.md`), digest)
+    // 图题首现上下文独立落盘（不进 digest 防 token 膨胀，≤10 图 × 400 字符；子会话需要图意时按需读）
+    const ctx = figureContexts(pages)
+    if (ctx.length) {
+      writeText(pPath(digDir, `${pid}.figs.md`), `# ${pid} 图题首现上下文（按需读，不整读）\n\n` + ctx.map(([k, v]) => `- ${k}：${v}`).join("\n") + "\n")
+    }
     log(`[${pid}] digest ${digest.length} 字符`)
   }
+  // keyfacts：全库精读前一览（每篇 ≤1200 字符；定位为按需查段不整读——主会话写任务卡与裁决二次评估升级申报时查段用）
+  const kfFiles = fs.readdirSync(digDir).filter(n => n.endsWith(".md") && !n.endsWith(".figs.md") && n !== "keyfacts.md" && n !== "brief.md").sort()
+  const chunks = []
+  for (const n of kfFiles) {
+    const raw = readText(pPath(digDir, n)) || ""
+    const pid = path.basename(n, ".md")
+    const head = raw.match(/## Page 1 \(head\)\n([\s\S]*?)(?=\n## |$)/)?.[1] || ""
+    let text = `### ${pid}\n摘要: ${clip(clean(head), 600)}\n`
+    for (const key of ["methods", "results", "discussion", "conclusion"]) {
+      const seg = raw.match(new RegExp(`## page \\d+ \\[${key}\\]\\n([\\s\\S]*?)(?=\\n## |$)`))?.[1]
+      if (seg) text += `${key}: ${clip(clean(seg), 400)}\n`
+    }
+    chunks.push(text.slice(0, 1250))
+  }
+  if (chunks.length) writeText(pPath(digDir, "keyfacts.md"), chunks.join("\n"))
 }
 
 /* ---------- brief：summaries → 主会话路由简报 ---------- */
@@ -252,10 +287,17 @@ export function cmdMaterial(root) {
       continue
     }
     const pid = String(s.id)
+    const dr = s.depth_reassessment
+    const drText = dr && dr.verdict && dr.verdict !== "keep"
+      ? `｜二次评估：${dr.verdict === "upgrade" ? "升级" : dr.verdict === "downgrade" ? "降级" : dr.verdict}${dr.reason ? `（${clip(dr.reason, 30)}）` : ""}`
+      : ""
     const lines = [
       `\n## [${pid}] ${clip(s.title_zh || s.title_en, 60)}`,
-      `- 方向：${clip((s.tags || []).join("、"), 40)}｜阅读深度：${statusZh[s.read_status] || s.read_status}｜${s.journal} ${s.year}${s.doi ? `｜doi:${s.doi}` : ""}`,
+      `- 方向：${clip((s.tags || []).join("、"), 40)}｜阅读深度：${statusZh[s.read_status] || s.read_status}${drText}｜${s.journal} ${s.year}${s.doi ? `｜doi:${s.doi}` : ""}`,
     ]
+    if (s.read_status === "abstract_only" && s.abstract_en) {
+      lines.push(`- 摘要（原文节选，仅可摘要级转述）：${clip(s.abstract_en, 220)}`)
+    }
     if (warnings.length) lines.push(`- ⚠️ 复核提醒：${warnings.slice(0, 2).join("；")}`)
     for (const [label, field] of [["背景", "background_zh"], ["问题", "question_zh"], ["体系", "system_zh"], ["方法", "method_zh"], ["结果", "results_zh"], ["创新", "innovation_zh"], ["局限", "limitation_zh"]]) {
       const v = s[field]
@@ -276,10 +318,87 @@ export function cmdMaterial(root) {
   log(`wrote ${out}（${blocks.length} 篇入库${skipped.length ? `，${skipped.length} 篇被拦` : ""}）`)
 }
 
-/* ---------- check：综述引用编号校验 ---------- */
+/* ---------- assemble：章节文件拼装综述 ---------- */
 
-/** check 子命令：综述中 [id] 引用必须全部存在于素材包；剔除代码块与链接后匹配 */
+/** assemble 子命令：deliverables/sections/{NN}_*.md 按文件名序拼装为单文件综述；
+ *  章节文件化是增量更新的前提：补拉循环只重写涉及章节，再重新拼装，不全篇重写 */
+export function cmdAssemble(root, args) {
+  const secDir = pPath(root, DIRS.deliverables, "sections")
+  if (!fs.existsSync(secDir)) {
+    console.log("FAIL sections/ 不存在：综述按章节写 deliverables/sections/{NN}_{章节名}.md 后再拼装")
+    process.exitCode = 1
+    return
+  }
+  const files = fs.readdirSync(secDir).filter(n => n.toLowerCase().endsWith(".md")).sort()
+  if (!files.length) {
+    console.log("FAIL sections/ 无 .md 章节文件")
+    process.exitCode = 1
+    return
+  }
+  const parts = []
+  for (const n of files) {
+    const body = readText(pPath(secDir, n))
+    if (body === null) throw new Error(`章节文件读取失败：${n}`)
+    parts.push(body.trimEnd())
+  }
+  const outPath = args.out || pPath(root, DIRS.deliverables, "综述.md")
+  writeText(outPath, parts.join("\n\n") + "\n")
+  log(`wrote ${outPath}（${files.length} 个章节，共 ${parts.reduce((a, b) => a + b.length, 0)} 字符）`)
+}
+
+/* ---------- check：综述引用编号校验 + 交付自检 ---------- */
+
+/** 内置章节关键词表：章名 → 匹配词（命中综述任一 ^#{1,3} 标题即算该章存在），顺序 = 模板章节顺序；
+ *  匹配词按章名就近映射（如「对用户研究的相关点」容忍「启示」写法），标题匹配前先剥编号前缀 */
+const REVIEW_SECTIONS = [
+  ["研究背景与问题定义", ["背景"]],
+  ["领域全景与研究方向分类", ["全景", "分类"]],
+  ["代表性方法与技术路线", ["技术路线", "方法"]],
+  ["关键结果与性能对比", ["结果", "性能"]],
+  ["研究范式演进", ["范式"]],
+  ["现有局限与挑战", ["局限", "挑战"]],
+  ["未来方向与开放问题", ["未来", "开放"]],
+  ["对用户研究的相关点", ["相关点", "启示"]],
+  ["文献映射", ["文献映射", "参考文献"]],
+]
+
+/** 判断标注（WARN 级）必查的两章章名；匹配词复用 REVIEW_SECTIONS 表 */
+const JUDGMENT_SECTION_NAMES = ["现有局限与挑战", "未来方向与开放问题"]
+
+/** 文献映射节的行首编号提取（容忍 -/* 列表符号）；映射节内素材包外编号由 invalid 全文校验覆盖，此处不单报 */
+const MAPPING_ID_RE = /^\s*[-*]?\s*\[([0-9A-Za-z_-]+)\]/gm
+
+/** 查章名对应的匹配词表（REVIEW_SECTIONS 反查） */
+function sectionWords(name) {
+  return REVIEW_SECTIONS.find(([n]) => n === name)[1]
+}
+
+/** 综述章节扫描：识别 ^#{1,3} 标题并切块，内容取到下一个同级或更高级标题为止（低级子标题归入父章）。
+ *  设计思路：交付自检三项（章节齐全性 / 映射一致性 / 判断标注）都依赖「标题定位 + 章内容」，一次
+ *  扫描切块后三处复用；标题剥掉「9.」「1.2」「一、」等编号前缀，使关键词匹配不依赖编号写法 */
+function splitSections(reviewText) {
+  const lines = reviewText.split(/\r?\n/)
+  const heads = []
+  lines.forEach((line, i) => {
+    const m = line.match(/^(#{1,3})(?!#)\s*(.*)$/)
+    if (!m) return
+    const title = m[2].replace(/^(?:\d+(?:\.\d+)*|[一二三四五六七八九十]+)[.、．:：]?\s*/, "").trim()
+    heads.push({ level: m[1].length, title, line: i })
+  })
+  return heads.map((h, i) => {
+    // findIndex 返回 heads 下标，切片需要行号：换算成命中标题的 line 行号再切
+    const endIdx = heads.findIndex((n, j) => j > i && n.level <= h.level)
+    const endLine = endIdx === -1 ? lines.length : heads[endIdx].line
+    return { level: h.level, title: h.title, body: lines.slice(h.line + 1, endLine).join("\n") }
+  })
+}
+
+/** check 子命令：引用编号闭环校验（综述 [id] 必须全在素材包，剔除代码块与链接后匹配）+ 三项交付自检——
+ *  1）章节齐全性（FAIL）2）文献映射一致性（FAIL）3）「（综述者判断）」标注存在性（WARN，不拦交付）；
+ *  project.json 的 report.optional_sections 是用户合法裁剪章节的豁免通道 */
 export function cmdCheck(root, args) {
+  const cfg = loadProject(root)
+  const optional = new Set(cfg.optionalSections)
   const materialFile = args.material || pPath(root, "review-material.md")
   const reviewFile = args.review || pPath(root, DIRS.deliverables, "调研综述.md")
   const materialText = readText(materialFile)
@@ -303,26 +422,61 @@ export function cmdCheck(root, args) {
   const cited = [...scrubbed.matchAll(/\[([0-9A-Za-z_-]+)\]/g)].map(m => m[1])
   const citedSet = new Set(cited)
   const invalid = [...citedSet].filter(id => !validIds.has(id))
+  // —— 交付自检 1：章节齐全性（豁免章剔除出必查表；任一标题命中匹配词即算存在）——
+  const sections = splitSections(reviewText)
+  const sections_missing = []
+  for (const [name, words] of REVIEW_SECTIONS) {
+    if (optional.has(name)) continue
+    if (!sections.some(s => words.some(w => s.title.includes(w)))) sections_missing.push(name)
+  }
+  // —— 交付自检 2：文献映射一致性（映射节缺失时由自检 1 的缺章覆盖，此处不双报）——
+  const mapping_missing = []
+  const mapBlock = sections.find(s => sectionWords("文献映射").some(w => s.title.includes(w)))
+  if (mapBlock) {
+    const mapped = new Set([...mapBlock.body.matchAll(MAPPING_ID_RE)].map(m => m[1]))
+    for (const id of validIds) if (!mapped.has(id)) mapping_missing.push(id)
+  }
+  // —— 交付自检 3：「（综述者判断）」标注存在性（章不存在时不报，缺失已由自检 1 抓）——
+  const judgment_warnings = []
+  for (const name of JUDGMENT_SECTION_NAMES) {
+    if (optional.has(name)) continue
+    const block = sections.find(s => sectionWords(name).some(w => s.title.includes(w)))
+    if (block && !block.body.includes("综述者判断")) judgment_warnings.push(name)
+  }
   const report = {
     review: reviewFile, material: materialFile,
     cited: [...citedSet].sort(), valid: [...validIds].sort(), invalid, total: citedSet.size,
-    ok: !invalid.length && citedSet.size > 0,
+    sections_missing, mapping_missing, judgment_warnings,
+    ok: !invalid.length && citedSet.size > 0 && !sections_missing.length && !mapping_missing.length,
   }
   writeJson(pPath(root, "review_check.json"), report)
   if (invalid.length) {
-    console.log(`FAIL 非法引用：${invalid.join(", ")}（素材包中没有这些编号）`)
+    console.log(`FAIL 非法引用：${invalid.join("、")}（素材包中没有这些编号）`)
     process.exitCode = 1
   } else if (!citedSet.size) {
     console.log("WARN 综述中没有任何 [编号] 引用")
   } else {
     console.log(`OK 引用校验通过：${citedSet.size}/${validIds.size} 篇被引用，全部合法`)
   }
+  // 交付自检逐条行：缺章与映射缺失是 FAIL（拦交付），标注缺失是 WARN（不拦交付）
+  for (const name of sections_missing) console.log(`FAIL 缺少章节：「${name}」`)
+  if (mapping_missing.length) console.log(`FAIL 文献映射缺 ${mapping_missing.length} 篇：${mapping_missing.join("、")}`)
+  for (const name of judgment_warnings) console.log(`WARN 「${name}」章未见（综述者判断）标注`)
+  if (sections_missing.length || mapping_missing.length) process.exitCode = 1
+  // 全部干净时打一行自检汇总；有 FAIL/WARN 时逐条行已表达，不打 OK 汇总
+  if (report.ok && !judgment_warnings.length) {
+    const secTotal = REVIEW_SECTIONS.filter(([n]) => !optional.has(n)).length
+    const judgeTotal = JUDGMENT_SECTION_NAMES
+      .filter(n => !optional.has(n) && sections.some(s => sectionWords(n).some(w => s.title.includes(w)))).length
+    const judgePart = judgeTotal ? `、判断标注 ${judgeTotal}/${judgeTotal}` : ""
+    console.log(`OK 交付自检通过：章节 ${secTotal - sections_missing.length}/${secTotal}、文献映射 ${validIds.size - mapping_missing.length}/${validIds.size}${judgePart}`)
+  }
 }
 
 /* ---------- init / init-summaries：项目骨架 ---------- */
 
 const EMPTY_PAPERS_META = { title: "", topic: "", range: "", papers: [{ id: "01", title: "论文题名（必填）", doi: "", pmcid: "", kind: "", kind_zh: "", notes: "" }] }
-const EMPTY_PROJECT = { apis: { mailto: "researcher@example.com" }, compliance: { allow_third_party: false }, download: { workers: 4, max_mb: 60, timeout: 45 } }
+const EMPTY_PROJECT = { apis: { mailto: "researcher@example.com" }, compliance: { allow_third_party: false, tier3_allowlist: [] }, download: { workers: 4, max_mb: 60, timeout: 45 } }
 
 /** init 子命令：建目录骨架与模板文件（已存在的不覆盖） */
 export function cmdInit(root) {
@@ -346,22 +500,40 @@ export function cmdInitSummaries(root) {
   const errors = validateMeta(meta).errors
   if (errors.length) throw new Error("papers_meta.json 校验失败：" + errors.join("; "))
   const sumDir = ensureDir(pPath(root, DIRS.summaries))
+  // 摘要回填源：verify 产物里 EPMC/Crossref 已带 abstract（init-summaries 建模板时写入，已有条目缺则补填）
+  const verified = readJson(pPath(root, "papers_meta.verified.json"))
+  const vMap = new Map((verified?.papers || []).map(p => [String(p.id), p]))
   let n = 0
+  let backfill = 0
   for (const p of meta.papers) {
     const pid = String(p.id)
     const f = pPath(sumDir, `summary_${pid}.json`)
-    if (fs.existsSync(f)) continue
+    const vp = vMap.get(pid)
+    const abstractEn = vp?.verified?.europepmc?.abstract || vp?.verified?.crossref?.abstract || ""
+    if (fs.existsSync(f)) {
+      // 已存在：仅补填缺失的 abstract_en，不动其他字段
+      if (abstractEn) {
+        const s = readJson(f)
+        if (s && typeof s === "object" && !s.abstract_en) {
+          s.abstract_en = abstractEn
+          writeJson(f, s)
+          backfill++
+        }
+      }
+      continue
+    }
     writeJson(f, {
       id: pid,
       title_en: p.title, title_zh: "", journal: p.journal || "", year: p.year || null, doi: p.doi || "",
       read_status: "missing", evidence_pages: [], evidence_figs: [],
+      abstract_en: abstractEn,
       background_zh: "", question_zh: "", system_zh: "", method_zh: "", spec_evidence_zh: "",
       results_zh: "", performance_metrics: [], validation_zh: "",
       innovation_zh: "", limitation_zh: "", tags: [], key_figure: "", reviewed_at: "",
     })
     n++
   }
-  log(`初始化 ${n} 篇条目模板（已有 ${meta.papers.length - n} 篇未覆盖）`)
+  log(`初始化 ${n} 篇条目模板（已有 ${meta.papers.length - n} 篇未覆盖）${backfill ? `；回填 abstract_en ${backfill} 篇` : ""}`)
 }
 
 /** validate 子命令：全量或单篇校验 summaries；0 error 才 exit 0 */

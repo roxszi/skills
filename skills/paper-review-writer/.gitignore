@@ -1,0 +1,4 @@
+# 不进行Git版本控制的内容
+
+# 跟目录的node依赖
+/node_modules/

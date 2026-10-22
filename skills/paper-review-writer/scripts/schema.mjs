@@ -23,6 +23,7 @@ const SUMMARY_REQUIRED = [
 
 /** 内容字段长度上限（error 级只拦必填缺失；超长为 warning，先删水话再落盘，不改上限迁就内容） */
 const SUMMARY_LIMITS = {
+  abstract_en: 2000,
   background_zh: 300,
   question_zh: 200,
   method_zh: 600,
@@ -100,6 +101,18 @@ export function validateSummary(s) {
   const status = s.read_status
   if (status !== undefined && !READ_STATUSES.includes(status)) {
     errors.push(`read_status 非法：${JSON.stringify(status)}，允许值 ${READ_STATUSES.join(" / ")}`)
+  }
+  // depth_reassessment：缺失仅对已产生阅读行为的条目提醒（missing/未获取不报，初始化模板保持干净）；verdict 非法才拦截
+  if (s.depth_reassessment === undefined || s.depth_reassessment === null) {
+    if (status !== "missing") warnings.push(`depth_reassessment 缺失：建议补填对预判读法的二次评估`)
+  } else {
+    const dr = s.depth_reassessment
+    const verdict = dr && typeof dr === "object" ? dr.verdict : undefined
+    if (!verdict || !["keep", "upgrade", "downgrade"].includes(verdict)) {
+      errors.push(`depth_reassessment.verdict 非法：应为 keep/upgrade/downgrade`)
+    } else if (typeof dr.reason !== "string" || !dr.reason.trim()) {
+      warnings.push(`depth_reassessment.reason 为空：一句理由便于主会话裁决升级预算`)
+    }
   }
   if (status === "full_read" || status === "partial_read") {
     for (const field of ["evidence_pages", "evidence_figs"]) {

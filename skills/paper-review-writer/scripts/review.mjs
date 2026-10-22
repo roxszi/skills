@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url"
 import { projectRoot } from "./lib.mjs"
 import { cmdDownload, cmdVerify } from "./sources.mjs"
 import {
-  cmdBrief, cmdCheck, cmdDigest, cmdExtract, cmdInit, cmdInitSummaries,
+  cmdAssemble, cmdBrief, cmdCheck, cmdDigest, cmdExtract, cmdInit, cmdInitSummaries,
   cmdMaterial, cmdSave, cmdValidate,
 } from "./pipeline.mjs"
 
@@ -18,7 +18,7 @@ const USAGE = `paper-review-writer — 批量文献调研综述流水线
 流水线子命令（按阶段顺序）：
   init              建项目骨架（目录 + 模板文件，已存在不覆盖）
   verify            元数据核验（Crossref/OpenAlex/Europe PMC/Unpaywall）→ papers_meta.verified.json
-  download [--id]   合规下载（OA 链优先；第三方渠道默认关）→ papers/*.pdf
+  download [--id]   合规下载（OA 链优先；③档白名单自动；④档第三方默认关）→ papers/*.pdf
   extract [--id]    PDF 逐页文本（EPMC XML 降级）→ papers_txt/*.txt
   digest [--id]     精读缓冲（≤2.6KB/篇，含图题索引）→ digests/*.md
   init-summaries    按清单初始化条目模板（read_status: missing）
@@ -26,6 +26,7 @@ const USAGE = `paper-review-writer — 批量文献调研综述流水线
   validate [--id]   校验条目（0 error 才通过）
   brief             主会话路由简报（≤320 字/篇）→ digests/brief.md
   material          综述素材包（校验通过条目）→ review-material.md
+  assemble [--out X] 交付件 sections/{NN}_*.md 按序拼装为单文件综述
   check --review X  综述引用编号校验（素材包为合法集）→ review_check.json
 
 通用参数：
@@ -70,6 +71,7 @@ async function main() {
     case "validate": return cmdValidate(root, args)
     case "brief": return cmdBrief(root)
     case "material": return cmdMaterial(root)
+    case "assemble": return cmdAssemble(root, args)
     case "check": return cmdCheck(root, args)
     default:
       console.log(USAGE)

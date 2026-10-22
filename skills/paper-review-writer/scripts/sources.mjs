@@ -9,6 +9,9 @@ import { ensureDir, fetchWithTimeout, log, pool, pPath, readJson, slugify, write
 
 const SCI_HUB_MIRRORS = ["https://sci-hub.se/", "https://sci-hub.st/", "https://sci-hub.ru/"]
 
+/** ③档白名单已知渠道映射（新增渠道须同步 SKILL.md §2 与 acquisition-playbook §4） */
+const TIER3_CHANNEL_MIRRORS = { "sci-hub": SCI_HUB_MIRRORS }
+
 const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
 /** 读取 project.json（全可选；缺省值在此集中） */
@@ -20,11 +23,20 @@ export function loadProject(root) {
     maxMb: cfg?.download?.max_mb ?? 60,
     timeoutMs: (cfg?.download?.timeout ?? 45) * 1000,
     allowThirdParty: cfg?.compliance?.allow_third_party === true,
+    // ③档白名单：项目所有者显式写入即视为持久授权，命中已知渠道即自动尝试（SKILL.md §2）
+    tier3: Array.isArray(cfg?.compliance?.tier3_allowlist) ? cfg.compliance.tier3_allowlist : [],
+    // 交付自检豁免章节（check 用）：用户合法裁剪的章从必查表剔除，缺失不再报 FAIL
+    optionalSections: Array.isArray(cfg?.report?.optional_sections) ? cfg.report.optional_sections : [],
   }
 }
 
 function apiHeaders(mailto) {
   return { "User-Agent": `paper-review-writer/0.1 (mailto:${mailto})`, Accept: "application/json" }
+}
+
+/** 剥 HTML 标签与多余空白为纯文本（EPMC/Crossref 摘要回填用） */
+function stripHtml(s) {
+  return String(s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
 }
 
 async function getJson(url, cfg, params) {
@@ -46,6 +58,7 @@ async function crossrefDoi(doi, cfg) {
     journal: (m["container-title"] || [""])[0],
     year,
     authors: (m.author || []).slice(0, 12).map(a => `${a.given || ""} ${a.family || ""}`.trim()).join("; "),
+    abstract: stripHtml(m.abstract),
   }
 }
 
@@ -101,6 +114,7 @@ async function epmcById(pmcid, pmid, cfg) {
   return {
     title: r.title, journal: jinfo.title || "", year: r.pubYear ? Number.parseInt(r.pubYear, 10) : null,
     doi: r.doi, pmid: r.pmid, pmcid: r.pmcid,
+    abstract: stripHtml(r.abstractText),
     fulltexts: ((r.fullTextUrlList || {}).fullTextUrl || []).map(u => u.url),
   }
 }
@@ -241,8 +255,8 @@ async function tryDownload(url, dest, cfg, referer) {
   }
 }
 
-/** 下载单篇：按候选链依次尝试，返回结果记录 */
-async function downloadOne(p, cfg, allowThirdParty, papersDir) {
+/** 下载单篇：按候选链依次尝试，返回结果记录；tier3 = ③档白名单（自动），allowThirdParty = ④档临时授权 */
+async function downloadOne(p, cfg, allowThirdParty, tier3Allowlist, papersDir) {
   const pid = String(p.id)
   const candidates = []
   for (const c of manualCandidates(p)) candidates.push({ url: c[0], referer: c[1], src: "manual" })
@@ -257,6 +271,13 @@ async function downloadOne(p, cfg, allowThirdParty, papersDir) {
   if (vmeta.unpaywall?.pdf_url) candidates.push({ url: vmeta.unpaywall.pdf_url, src: "unpaywall" })
   for (const u of vmeta.europepmc?.fulltexts || []) {
     if (String(u).toLowerCase().includes("pdf")) candidates.push({ url: u, src: "epmc-fulltext" })
+  }
+  const doi3 = vmeta.doi || p.doi
+  if (doi3 && Array.isArray(tier3Allowlist)) {
+    for (const name of tier3Allowlist) {
+      const mirrors = TIER3_CHANNEL_MIRRORS[String(name).toLowerCase()]
+      if (mirrors) for (const m of mirrors) candidates.push({ url: m + doi3, src: `tier3-${name}` })
+    }
   }
   if (allowThirdParty && (vmeta.doi || p.doi)) {
     for (const m of SCI_HUB_MIRRORS) candidates.push({ url: m + (vmeta.doi || p.doi), src: "third-party" })
@@ -280,9 +301,9 @@ export async function cmdDownload(root, args) {
   const papersDir = ensureDir(pPath(root, "papers"))
   const targets = args.id ? meta.papers.filter(p => String(p.id) === String(args.id)) : meta.papers
   if (!targets.length) throw new Error(`--id ${args.id} 无匹配论文`)
-  log(`下载 ${targets.length} 篇（并发 ${cfg.workers}，第三方渠道${allowThirdParty ? "已授权开启" : "关闭"}）`)
+  log(`下载 ${targets.length} 篇（并发 ${cfg.workers}，③档白名单 ${cfg.tier3.length} 条，④档${allowThirdParty ? "已授权开启" : "关闭"}）`)
   const results = await pool(targets, cfg.workers, async p => {
-    const r = await downloadOne(p, cfg, allowThirdParty, papersDir)
+    const r = await downloadOne(p, cfg, allowThirdParty, cfg.tier3, papersDir)
     log(`[${r.id}] ${r.ok ? `OK ${r.file}（${r.source}）` : `FAIL（已试 ${r.tried} 个候选）`}`)
     return r
   })
@@ -298,7 +319,8 @@ export async function cmdDownload(root, args) {
 /** 取 Europe PMC fullTextXML 并剥标签为纯文本（PDF 拿不到时的全文降级源） */
 export async function fetchEpmcXmlText(pmcid, cfg) {
   const url = `https://www.ebi.ac.uk/europepmc/webservices/rest/${encodeURIComponent(pmcid)}/fullTextXML`
-  const r = await fetchWithTimeout(url, { headers: apiHeaders(cfg.mailto) }, Math.min(cfg.timeoutMs, 30000))
+  // Accept 必须兼容 XML：该端点对 Accept: application/json 返回 406（2026-10-22 实测），不能复用 apiHeaders
+  const r = await fetchWithTimeout(url, { headers: { "User-Agent": `paper-review-writer/0.1 (mailto:${cfg.mailto})`, Accept: "application/xml" } }, Math.min(cfg.timeoutMs, 30000))
   if (!r.ok) return null
   const xml = await r.text()
   if (!xml.trim()) return null

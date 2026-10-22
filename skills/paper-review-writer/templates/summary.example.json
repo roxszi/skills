@@ -6,6 +6,7 @@
   "year": 2021,
   "doi": "10.1038/s41586-021-03819-2",
   "read_status": "full_read",
+  "depth_reassessment": { "verdict": "upgrade", "reason": "读完 digest 发现对核心章节论证关键，按全文已读补读" },
   "evidence_pages": ["p1", "p3", "p5"],
   "evidence_figs": ["Fig. 1", "Table 1"],
   "background_zh": "蛋白质三维结构决定功能但实验解析成本高；从序列直接预测结构是长期难题。（≤300 字）",
