@@ -18,7 +18,7 @@
 |---|---|---|---|
 | `skills/local-kb/` | 本地信息资源数据库 | 1.7.0 | bun |
 | `skills/paper-methodology-audit/` | 文献精读（方法学审查） | 1.3.0 | — |
-| `skills/paper-review-writer/` | 文献调研与综述 | 0.2.5 | node ≥ 22.13 |
+| `skills/paper-review-writer/` | 文献调研与综述 | 0.4.2 | node ≥ 22.13 |
 | `skills/tech-brief-writer/` | 技术简报撰写 | 4.4.0 | — |
 <!-- END: SKILLS-OVERVIEW -->
 

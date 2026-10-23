@@ -7,8 +7,8 @@ import { fileURLToPath } from "node:url"
 import { projectRoot } from "./lib.mjs"
 import { cmdDownload, cmdVerify } from "./sources.mjs"
 import {
-  cmdAssemble, cmdBrief, cmdCheck, cmdDigest, cmdExtract, cmdInit, cmdInitSummaries,
-  cmdMaterial, cmdSave, cmdValidate,
+  cmdAssemble, cmdBrief, cmdCheck, cmdDigest, cmdDispatch, cmdExtract, cmdInit, cmdInitSummaries,
+  cmdMap, cmdMaterial, cmdSave, cmdValidate,
 } from "./pipeline.mjs"
 
 const USAGE = `paper-review-writer — 批量文献调研综述流水线
@@ -28,6 +28,9 @@ const USAGE = `paper-review-writer — 批量文献调研综述流水线
   material          综述素材包（校验通过条目）→ review-material.md
   assemble [--out X] 交付件 sections/{NN}_*.md 按序拼装为单文件综述
   check --review X  综述引用编号校验（素材包为合法集）→ review_check.json
+  map [--out X]     文献映射章（条目 + 题录作者合流）→ deliverables/sections/09_文献映射.md
+  dispatch [--batch N] [--context X]
+                    精读派发任务单（待派队列 + 每篇任务卡全文）→ deliverables/dispatch.md
 
 通用参数：
   --project <目录>  项目根目录（缺省当前目录）
@@ -73,6 +76,8 @@ async function main() {
     case "material": return cmdMaterial(root)
     case "assemble": return cmdAssemble(root, args)
     case "check": return cmdCheck(root, args)
+    case "map": return cmdMap(root, args)
+    case "dispatch": return cmdDispatch(root, args)
     default:
       console.log(USAGE)
       if (args._ && args._ !== "help") process.exitCode = 2

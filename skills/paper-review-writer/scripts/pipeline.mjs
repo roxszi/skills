@@ -400,7 +400,21 @@ export function cmdCheck(root, args) {
   const cfg = loadProject(root)
   const optional = new Set(cfg.optionalSections)
   const materialFile = args.material || pPath(root, "review-material.md")
-  const reviewFile = args.review || pPath(root, DIRS.deliverables, "调研综述.md")
+  // 缺省综述路径与 assemble 缺省输出同名（综述.md）；旧项目用其他名时，唯一候选自动顶上，多候选拒绝并指引
+  let reviewFile = args.review
+  if (!reviewFile) {
+    reviewFile = pPath(root, DIRS.deliverables, "综述.md")
+    if (!fs.existsSync(reviewFile)) {
+      const dDir = pPath(root, DIRS.deliverables)
+      const cands = fs.existsSync(dDir) ? fs.readdirSync(dDir).filter(f => f.endsWith(".md")) : []
+      if (cands.length === 1) reviewFile = pPath(root, DIRS.deliverables, cands[0])
+      else if (cands.length > 1) {
+        console.log(`FAIL deliverables 下有多个候选综述（${cands.join("、")}），请用 --review 指定其一；缺省名与 assemble 输出一致为 综述.md`)
+        process.exitCode = 1
+        return
+      }
+    }
+  }
   const materialText = readText(materialFile)
   const reviewText = readText(reviewFile)
   if (materialText === null) {
@@ -560,4 +574,98 @@ export function cmdValidate(root, args) {
   } else {
     console.log(`OK ${names.length} 篇全部通过（warning 须逐条人工判断）`)
   }
+}
+
+/* ---------- map：文献映射章生成 ---------- */
+
+/** map 子命令：从条目与题录合流生成文献映射章（deliverables/sections/09_文献映射.md）。
+ * 设计思路：映射条目数随清单规模线性增长，手写易错且每个项目重复劳动；authors 在 verify 产物
+ * 的各源响应里（分号分隔「Family Given」结构），条目里没有，故两源合流：条目定收录
+ * （read_status 非 missing），题录定作者。产出出错整体重跑，不做行级补丁。
+ * --out 接文件名时拼进 sections/（缺省 09_文献映射.md），接绝对路径时直用（与 assemble 语义一致）；
+ * 文件名扫描字符集与 check 编号契约同集（[0-9A-Za-z_-]），排序用自然序防 summary_100 排到 summary_20 前。 */
+export function cmdMap(root, args) {
+  const verified = readJson(pPath(root, "papers_meta.verified.json"))
+  if (!verified?.papers) throw new Error("papers_meta.verified.json 不存在：先跑 verify")
+  if (!Array.isArray(verified.papers) || !verified.papers.length) throw new Error("论文清单为空：先跑 init 生成非空清单")
+  const sumDir = pPath(root, DIRS.summaries)
+  const names = fs.existsSync(sumDir) ? fs.readdirSync(sumDir).filter(n => /^summary_[0-9A-Za-z_-]+\.json$/.test(n)).sort((a, b) => a.localeCompare(b, "en", { numeric: true })) : []
+  if (!names.length) throw new Error("summaries/ 为空：先跑 init-summaries 并完成条目落盘")
+  const vMap = new Map(verified.papers.map(p => [String(p.id), p]))
+  const lines = []
+  let skipped = 0
+  for (const name of names) {
+    const s = readJson(pPath(sumDir, name))
+    if (!s || s.read_status === "missing") { skipped++; continue }
+    const p = vMap.get(String(s.id)) || {}
+    const authorsSrc = p.verified?.crossref?.authors || p.verified?.openalex?.authors || p.verified?.europepmc?.authors || ""
+    const list = authorsSrc.split(";").map(a => a.trim()).filter(Boolean)
+    const authorPart = list.length === 0 ? "" : list.length === 1 ? `${list[0]}. ` : `${list[0]} et al. `
+    const title = p.title || s.title_en || ""
+    const journal = p.journal || s.journal || ""
+    const year = p.year || s.year || ""
+    lines.push(`[${s.id}] ${authorPart}${title}. ${journal}, ${year}.${p.doi ? ` doi:${p.doi}` : ""}`)
+  }
+  const outDir = ensureDir(pPath(root, DIRS.deliverables, "sections"))
+  const outFile = path.isAbsolute(args.out || "") ? args.out : pPath(outDir, args.out || "09_文献映射.md")
+  writeText(outFile, `# 9. 文献映射\n\n${lines.join("\n")}\n`)
+  if (!lines.length) { log("WARN：无已获取条目，映射章为空（全部条目 missing？先检查获取台账）"); process.exitCode = 1 }
+  log(`文献映射 ${lines.length} 条 → ${outFile}${skipped ? `（跳过未获取 ${skipped} 篇）` : ""}`)
+}
+
+/* ---------- dispatch：精读派发任务单 ---------- */
+
+/** dispatch 子命令：生成精读派发任务单（待派队列 + 每篇完整任务卡 + 回收状态）。
+ * 设计思路：批量派发的任务卡结构相同，只有编号与路径不同；预生成文本让主会话照单派发，
+ * 消除逐篇现编任务卡的上下文开销与漂移风险。并发档位由停点问询决定，--batch 只控制
+ * 单次输出的任务卡张数（标准档 2，非法值统一回落 2）；回收判定与 SKILL.md §4 一致：
+ * 条目存在且非 missing 且 validateSummary 无 error；有 error 的归待修，不计入已回收。 */
+export function cmdDispatch(root, args) {
+  const meta = readJson(pPath(root, "papers_meta.verified.json")) || readJson(pPath(root, "papers_meta.json"))
+  if (!meta?.papers) throw new Error("论文清单不存在：先跑 init / verify")
+  if (!Array.isArray(meta.papers) || !meta.papers.length) throw new Error("论文清单为空：先跑 init 生成非空清单")
+  const sumDir = pPath(root, DIRS.summaries)
+  const digestDir = pPath(root, DIRS.digests)
+  const batchRaw = parseInt(args.batch, 10)
+  const batch = Number.isFinite(batchRaw) && batchRaw >= 1 ? batchRaw : 2
+  const context = args.context || "【主会话填：综述核心问题与用户敲定的重点】"
+  const pMap = new Map(meta.papers.map(p => [String(p.id), p]))
+  const done = [], pending = [], repair = []
+  for (const pid of pMap.keys()) {
+    const s = fs.existsSync(pPath(sumDir, `summary_${pid}.json`)) ? readJson(pPath(sumDir, `summary_${pid}.json`)) : null
+    if (!s || !s.read_status || s.read_status === "missing") pending.push(pid)
+    else if (validateSummary(s).errors.length) repair.push(pid)
+    else done.push(pid)
+  }
+  const cards = pending.slice(0, batch).map(pid => {
+    const p = pMap.get(pid)
+    const noDigest = fs.existsSync(pPath(digestDir, `${pid}.md`)) ? "" : "\n   ⚠ `digests/" + pid + ".md` 不存在：先跑 `digest --id " + pid + "` 再派发。"
+    return [
+      `## 任务卡 ${pid}｜${p.title || ""}`,
+      noDigest,
+      "1. 输入 = `digests/" + pid + ".md`（必读）+ `papers_txt/" + pid + ".txt`（仅定向回查，不整读）+ digest 尾部图题索引 + `digests/" + pid + ".figs.md`（需要图意时读）。",
+      "2. 上下文 = " + context,
+      "3. 任务 = 按 `references/条目字段契约.md` 填条目。",
+      "4. 硬约束 = 只写读到的内容、证据链必填、read_status 按实际深度申报（只读到摘要就报仅摘要，禁止拔高）、附 depth_reassessment（对预判深度的二次评估：维持/升级/降级 + 一句理由）。",
+      "5. 落盘 = `node scripts/review.mjs save --project <项目目录> --id " + pid + "`（stdin JSON，先落盘再返回；中文经执行工具 stdin 直传，落盘后统计 ? 数验证）。",
+      "6. 返回一行 = 编号、阅读深度中文含义、二次评估结论、条目路径。",
+    ].filter(Boolean).join("\n")
+  })
+  const rest = pending.slice(batch)
+  const text = [
+    `# 精读派发任务单（已回收 ${done.length}/${meta.papers.length}）`,
+    "",
+    `- 本批任务卡 ${cards.length} 张：${pending.slice(0, batch).join("、") || "无"}`,
+    rest.length ? `- 队列剩余：${rest.join("、")}` : "- 队列剩余：无",
+    done.length ? `- 已回收：${done.join("、")}` : "- 已回收：无",
+    repair.length ? `- 待修（条目存在但校验有 error，重修后自动计入已回收）：${repair.join("、")}` : "",
+    "",
+    "并发按停点 2 问询的档位执行（标准档同时 2 个子会话）：完成事件回收后从队列补派，不一次性派满。",
+    "",
+    cards.length ? cards.join("\n\n") : "本批无待派篇目。",
+    "",
+  ].filter(Boolean).join("\n")
+  const outFile = pPath(root, DIRS.deliverables, "dispatch.md")
+  writeText(outFile, text)
+  log(`任务单已生成：待派 ${pending.length}、本批 ${cards.length} 张${repair.length ? `、待修 ${repair.length}` : ""} → ${outFile}`)
 }

@@ -6,7 +6,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { validateMeta, validateSummary } from "../scripts/schema.mjs"
-import { cmdAssemble, cmdDigest, cmdBrief, cmdMaterial, cmdCheck, cmdValidate, cmdInitSummaries, figureIndex, figureContexts } from "../scripts/pipeline.mjs"
+import { cmdAssemble, cmdDigest, cmdBrief, cmdMaterial, cmdCheck, cmdValidate, cmdInitSummaries, cmdMap, cmdDispatch, figureIndex, figureContexts } from "../scripts/pipeline.mjs"
 import { writeJson, writeText, readText, readJson } from "../scripts/lib.mjs"
 
 const results = []
@@ -139,6 +139,19 @@ const MATERIAL_3 = "## [01] 甲篇\n- 方法：x\n## [02] 乙篇\n- 方法：y\n
   cmdCheck(proj, {})
   const report2 = readJson(path.join(proj, "review_check.json"))
   assert("全合法引用通过", report2.ok === true)
+  // 缺省路径三分支：用不同内容区分实际读到的文件（缺省名命中 / 唯一候选回退 / 多候选拒绝）
+  writeText(path.join(proj, "deliverables", "综述.md"), fullReview(["01"]))
+  writeText(path.join(proj, "deliverables", "调研综述.md"), "正文 [88]。")
+  cmdCheck(proj, {})
+  assert("check 缺省名 综述.md 命中（非回退）", (readJson(path.join(proj, "review_check.json")) || {}).ok === true)
+  fs.unlinkSync(path.join(proj, "deliverables", "综述.md"))
+  cmdCheck(proj, {})
+  const r3 = readJson(path.join(proj, "review_check.json")) || {}
+  assert("check 唯一候选 调研综述.md 回退命中", r3.ok === false && (r3.invalid || []).includes("88"))
+  writeText(path.join(proj, "deliverables", "旧稿.md"), "x")
+  const codeMulti = await runCmd(() => cmdCheck(proj, {}))
+  assert("check 多候选拒绝 exit 1", codeMulti === 1)
+  fs.unlinkSync(path.join(proj, "deliverables", "旧稿.md"))
   fs.rmSync(proj, { recursive: true, force: true })
 }
 /* 9. validate 命令级：0 error exit 0 / 有 error exit 1 */
@@ -255,6 +268,80 @@ const MATERIAL_3 = "## [01] 甲篇\n- 方法：x\n## [02] 乙篇\n- 方法：y\n
   const report = readJson(path.join(proj, "review_check.json"))
   assert("豁免章缺失不再 FAIL 且 ok=true", report.sections_missing.length === 0 && report.ok === true)
   fs.rmSync(proj, { recursive: true, force: true })
+}
+
+/* 19. map：文献映射章生成（条目定收录、题录定作者、未获取跳过、异常分支抛错） */
+{
+  const proj = tmpProj()
+  writeJson(path.join(proj, "papers_meta.verified.json"), { title: "t", range: "", papers: [
+    { id: "01", title: "Paper One", doi: "10.1/1", year: 2024, journal: "J One", verified: { crossref: { authors: "Holly J Butler; Lorna Ashton" } } },
+    { id: "02", title: "Paper Two", doi: "10.1/2", year: 2023, journal: "J Two", verified: {} },
+    { id: "03", title: "Paper Three", doi: "10.1/3", year: 2022, journal: "J Three", verified: { crossref: { authors: "Solo Author" } } },
+  ] })
+  writeJson(path.join(proj, "summaries", "summary_01.json"), GOOD_SUMMARY)
+  writeJson(path.join(proj, "summaries", "summary_02.json"), { ...GOOD_SUMMARY, id: "02", read_status: "missing", evidence_pages: [], evidence_figs: [], depth_reassessment: { verdict: "keep", reason: "未获取不评" } })
+  writeJson(path.join(proj, "summaries", "summary_03.json"), { ...GOOD_SUMMARY, id: "03" })
+  cmdMap(proj, {})
+  const mapText = readText(path.join(proj, "deliverables", "sections", "09_文献映射.md")) || ""
+  assert("map 多作者首作者加 et al.", mapText.includes("[01] Holly J Butler et al. Paper One. J One, 2024. doi:10.1/1"))
+  assert("map 跳过未获取条目", !mapText.includes("[02]"))
+  assert("map 单作者不加 et al.", mapText.includes("[03] Solo Author. Paper Three"))
+  fs.rmSync(proj, { recursive: true, force: true })
+  // 异常分支：verified 缺失 / 清单为空数组 / summaries 为空 → 全部抛错拒绝静默产出
+  const bad = tmpProj()
+  let threw = false
+  try { cmdMap(bad, {}) } catch { threw = true }
+  assert("map verified 缺失抛错", threw)
+  writeJson(path.join(bad, "papers_meta.verified.json"), { title: "t", range: "", papers: [] })
+  threw = false
+  try { cmdMap(bad, {}) } catch { threw = true }
+  assert("map 空清单抛错", threw)
+  writeJson(path.join(bad, "papers_meta.verified.json"), { title: "t", range: "", papers: [{ id: "01", title: "P" }] })
+  threw = false
+  try { cmdMap(bad, {}) } catch { threw = true }
+  assert("map summaries 为空抛错", threw)
+  fs.rmSync(bad, { recursive: true, force: true })
+  // 全 missing → 空映射章 + exitCode 1（不静默成功）
+  const allMiss = tmpProj()
+  writeJson(path.join(allMiss, "papers_meta.verified.json"), { title: "t", range: "", papers: [{ id: "01", title: "P" }] })
+  writeJson(path.join(allMiss, "summaries", "summary_01.json"), { ...GOOD_SUMMARY, read_status: "missing", evidence_pages: [], evidence_figs: [], depth_reassessment: { verdict: "keep", reason: "未获取不评" } })
+  const missCode = await runCmd(() => cmdMap(allMiss, {}))
+  assert("map 全 missing 空章且 exitCode 1", missCode === 1 && !(readText(path.join(allMiss, "deliverables", "sections", "09_文献映射.md")) || "").includes("[01]"))
+  fs.rmSync(allMiss, { recursive: true, force: true })
+}
+/* 20. dispatch：任务单生成（回收状态 + 本批任务卡 + batch 控制 + 待修分类 + 异常分支） */
+{
+  const proj = tmpProj()
+  writeJson(path.join(proj, "papers_meta.json"), { title: "t", range: "", papers: [
+    { id: "01", title: "P1" }, { id: "02", title: "P2" }, { id: "03", title: "P3" },
+  ] })
+  writeJson(path.join(proj, "summaries", "summary_01.json"), GOOD_SUMMARY)
+  cmdDispatch(proj, { batch: "2", context: "测试上下文" })
+  const d = readText(path.join(proj, "deliverables", "dispatch.md")) || ""
+  assert("dispatch 本批含任务卡要素", d.includes("## 任务卡 02｜P2") && d.includes("## 任务卡 03｜P3") && d.includes("测试上下文") && d.includes("--id 02"))
+  assert("dispatch 回收与队列正确", d.includes("已回收 1/3") && d.includes("已回收：01") && d.includes("队列剩余：无"))
+  assert("dispatch digest 缺失任务卡带 ⚠ 标注", d.includes("⚠") && d.includes("digest --id 02"))
+  fs.rmSync(proj, { recursive: true, force: true })
+  // 待修分类：条目存在但 validate 有 error → 不计已回收，单列待修；batch 非法值统一回落 2（需 pending ≥ 2 才能测出回落）
+  const proj2 = tmpProj()
+  writeJson(path.join(proj2, "papers_meta.json"), { title: "t", range: "", papers: [
+    { id: "01", title: "P1" }, { id: "02", title: "P2" }, { id: "03", title: "P3" },
+  ] })
+  writeJson(path.join(proj2, "summaries", "summary_01.json"), { ...GOOD_SUMMARY, read_status: "partial_read", evidence_pages: [], evidence_figs: [] })
+  cmdDispatch(proj2, { batch: "-1", context: "x" })
+  const d2 = readText(path.join(proj2, "deliverables", "dispatch.md")) || ""
+  assert("dispatch 待修条目不计已回收", d2.includes("已回收 0/3") && d2.includes("待修（条目存在但校验有 error，重修后自动计入已回收）：01"))
+  assert("dispatch batch 非法值回落 2 张", d2.includes("本批任务卡 2 张：02、03") && d2.includes("队列剩余：无"))
+  // 空清单：非数组或空数组 → 抛错拒绝静默产出
+  const bad = tmpProj()
+  let threw = false
+  try { cmdDispatch(bad, {}) } catch { threw = true }
+  assert("dispatch 清单缺失抛错", threw)
+  writeJson(path.join(bad, "papers_meta.json"), { title: "t", range: "", papers: [] })
+  threw = false
+  try { cmdDispatch(bad, {}) } catch { threw = true }
+  assert("dispatch 空清单抛错", threw)
+  fs.rmSync(bad, { recursive: true, force: true })
 }
 
 /** 运行一个会自行设置 exitCode 的命令函数，返回进程退出码 */
