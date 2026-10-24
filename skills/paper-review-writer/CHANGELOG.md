@@ -2,6 +2,45 @@
 
 > 本文件面向 skill 编写者：版本演进、设计取舍、致谢声明记录于此。使用者业务闭环不需要读本文件；SKILL.md 正文不携带版本历史。
 
+## 0.5.2（2026-10-24）
+
+- **结构整合轮**（用户终审要求：查补丁添补丁 + 按 skill-rule.md 章程审视；纯文档轮，脚本零改动，回归 64/64 复跑通过）：
+  - frontmatter version 补同步：SKILL.md 停在 0.5.0 两轮（package.json 已 0.5.1；0.4.2 曾修过同类漏更），本轮直接落 0.5.2。
+  - 通用性修复：§4 会话策略段的宿主工具名具体写法改能力语言（skill-rule §二「适配表是工具名唯一合法出处」），工具名回归 §1 适配表；适配表子会话行能力要求补「向已创建会话续投追问」。
+  - 零散整合：整页兜底的手动裁剪流程三处重复（SKILL.md §3.4、§5.4、playbook §1.3）收敛为 SKILL.md 单点，playbook 改为引用；§3.4「决策树五分支」去具体数字防漂移。
+  - 文档与实现对齐：playbook §1.2 决策树补矢量感知行为（b 分支邻近矢量簇并窗、d 分支图内标注行排除与大矢量簇整页兜底），消除「决策树旧、边界条新」的脱节。
+  - 矛盾清除：playbook §1.5 legends 页新旧两条边界冲突（旧「有裁剪产物人工过目」vs 0.5.1「页面不产图」）删除旧条留新条，补实测数字 17/17；实测日期笔误 2026-10-25 → 2026-10-24。
+  - 编写者线文档状态声明：references/借鉴与复盘两文档头部标注「改造已全部落地，结论以 CHANGELOG 为准」，防「待拍板 / 待实施」清单误导后续维护。
+  - 本条目断言数勘误 63 → 64（实测 64/64）。
+
+## 0.5.1（2026-10-24）
+
+- **独立审核修复轮**（子会话六维审核 + 主会话批复全采纳）：阻断 2 + 建议 6 + 待观察 5。
+  - 阻断① export-html 图片基准：buildStandaloneHtml 新增 opts.imgBaseDir，export-html 子命令传项目根（md 写 figures/... 相对项目根，与 §3.4 配图纪律一致；旧实现按 md 所在目录解析，缺省 deliverables/ 布局下全图缺失退码 2）；CLI 直跑仍按 md 目录；补缺省布局端到端回归断言。
+  - 阻断② 移除拼接畸形 pnpm-lock.yaml（两份 lockfileVersion 拼接、importer 无五依赖，疑似 workspace 成员形态下误生成）；lockfile 不随 skill 分发。
+  - J1 跨页装饰图过滤死代码修复：页数基准改用本进程 doc.numPages（fig_embed 不产出 totalPages，旧条件恒 false，非白跨页装饰图会以 embedded 最高信任级漏进图集）。
+  - J2 issues.json 落盘：阶段 1 embed 与阶段 2 render 异常登记合并写出（旧只进 stdout 进程结束即失）；fig_run 头注与 playbook 同步，删除无实现的 previews/ 承诺。
+  - J3 重跑清空保护：mtime 新于旧 manifest 或 manifest 未记载的 fig_N.png 视为用户手动件，移入 _user_saved/ 不删（旧实现静默删除用户按整页兜底工作流手动裁剪的图）。
+  - J4 非 .md 输入防覆盖：outFile===inFile 时追加 .html，不再覆盖综述源文件。
+  - J5 依赖声明对齐实测组合：@napi-rs/canvas ^0.1.80→^1.0.13、sharp ^0.34.5→^0.35.5（五篇回归与批跑即此组合验证；0.1.80 声明会让陌生机装到从未验证的 0.1.x）。
+  - J6 figures 汇总三分：无 PDF / 失败 / 有 PDF 零图，不再把后两者误报为无 PDF 存档。
+  - 小项：caption 正则加 i + 小写连写识别（figure 1abc）；decodeURIComponent 畸形 % 单图降级不炸整次导出；<img> 单引号/大写变体识别；isMain 改 basename 判定（盘符大小写免疫）；CHANGELOG「7 断言」勘误为 6。
+  - 实战修复 2 条（03/49/51 三篇验证文献暴露，批复外新增）：
+    - 碎片页 Form XObject 坐标系失真守卫：图像包在 Form group 内时 opList 线性 CTM 跟踪拿到 Form 内部坐标（平移巨大、尺寸正常），bbox 飞出页外，extract clamp 后裁出 1px 宽空白废图（49 篇 6/6 全废，silent 级）。守卫判据 = bbox 超页界（容差 2pt）或退化（<5pt），失真页全部碎片回退 embedded 直提（碎片本身是完整位图，直提即最高质量）；extract 前另加 <50px 退化拦截（crop-degenerate）。
+    - 文字页窗口薄拦截：legends 汇总页 caption 孤行间窗口仅 15-57pt，低于 bandH≥60 文字带检测阈值，scale=4 时裁出 79-147px 文字横条假图（03 篇 2 张，绕过 crop-too-thin<50px 拦截）。bandH<60pt 渲染前拦截（crop-window-thin，约 2.1cm，正常图不会这么扁）。
+  - 矢量图感知（用户审图反馈驱动，51/03 篇实测）：51 篇原文献 4 图只出 3 图且 Fig.1 截图不完整——Fig.4 为纯矢量图整张丢失（图内标注行被误判正文行致窗口塌缩、过薄拦截误杀），Fig.1 为位图+矢量混排复合图（拼版只罩位图碎片，3 个矢量子图在窗外）。修复五件套：① constructPath 矢量 bbox 入簇（pdfjs 6 args[2] minMax × CTM，页内聚类）；② d 分支 up 查找与文字覆盖统计排除图内标注行（行面积 ≥35% 落簇内）；③ bandH<60 拦截前大矢量簇整页兜底（vec-figure-fullpage-fallback，Fig.4 类纯矢量图不丢图）；④ b 分支邻近矢量簇迭代并窗（pad 30pt，混合图完整裁剪，51 Fig.1 五子图全进窗口）；⑤ 回归修复（03 篇 16→33 图）：整页装饰框簇过滤（宽高双 ≥95% 页面）+ 图注汇总页识别后直接跳过产图（实测该类页裁剪产物 17/17 全为图注文字假图）。三篇终态：03=16 全 embedded、51=4 图（2+1+1）、49=14 全 embedded。
+  - 回归 59 → 64 断言（export_html 块重构：raw script 原样保留、引擎不新增脚本替代近恒真旧断言；新增 imgBaseDir 端到端、畸形 % 降级 2 断言；矢量感知轮净增 1）。
+
+## 0.5.0（2026-10-24）
+
+- **五步化架构**（用户拍板：原「四步工作流」第 4 步拆为两步）：第 4 步 = 成文与自检，第 5 步 = 一键自包含 HTML 导出（`export-html` 子命令）。第 5 步独立可重入是设计核心：只依赖综述 md 与其引用的本地图片；用户说「重新导出 HTML」「重新执行第五步」「我修正了图片，请重新导出」只跑本步，不回跑精读与成文。典型循环：导出 → 用户手动裁剪整页图并更新 md → 再触发第 5 步 → 终稿。
+- **新增 `figures` 子命令（第 3.4 步·图表提取）**：逐篇 spawn 两段进程隔离链路（fig_run.mjs 编排 fig_embed.mjs / fig_render.mjs），产物 `figures/{id}_{slug}/fig_N.png` + manifest（origin 四标签：内嵌直提 / 转正直提 / 渲染裁剪 / 整页截取）；决策树五分支 + 双正则 caption + legends 回填 + CTM 碎片聚类 + 旋转转正 + 空白拦截，历经 5 篇跨版式（数字版 / 预印本 / 1991 扫描版）批量试跑与两轮修复。
+- **整页兜底红线（不放假图）**：提不出真图或裁剪产物为文字段（文字带检测：窗口内文本行覆盖 ≥1/3 高度）时，不放假图，降级图表所在页整页高清截取供用户手动裁剪。fig_render 同轮修复：图区上界查找排除 caption 行自身（v2 曾把 caption 文字块自身当图裁出——09 篇 fig_4 文字段假图根因）。
+- **新增交付链路手册** `references/delivery-playbook.md`：提图架构与决策树、manifest 契约、已知边界、HTML 导出口径与重入循环。
+- **依赖扩容**（package.json 同步；lockfile 不随 skill 分发，首次 install 自动生成）：pdfjs-dist / pdf-parse / @napi-rs/canvas@^0.1.80 / sharp / marked；engines 对齐 node ≥22.13。注意：本 workspace 的 pnpm 把 skill 目录当 workspace 成员，`pnpm install` 不建成员 node_modules（依赖向上解析）；陌生机器在 skill 目录任一包管理器 install 后自足。
+- **原生崩溃坑（重要）**：skill 目录 node_modules/.pnpm 残留旧版 @napi-rs/canvas@1.0.11 物理副本时，JBIG2 扫描页渲染必段错误（0xC0000005，与 workspace 同物理 pdfjs 但 skill 位置必崩，workspace 位置必通，与 cwd / wasmUrl / useWasm 均无关）；删除整个 node_modules 重建后消失。教训：降级原生依赖后必须清 .pnpm 残留，只改顶层 junction 不够。
+- 回归新增 export_html 6 断言（内嵌/外链/缺失计数、base64 data URI、缺失引用保留、零外链脚本）。
+
 ## 0.4.2（2026-10-23）
 
 - **启动前四步工作流告知**（用户建议：全流程时长可达一天一夜，一上来先告知完整工作流与 tips，预期管理）：§0「启动前一句话申报」升级为四步告知（①预调研海选——需等十几分钟、完成后敲方向；②获取全文——教育网最佳、拉完交台账等定夺；③吃透文献——纯本地低并发耗时数小时、适合夜间挂机、顺利自动连跑第 4 步；④成文与自检——完成后直接看初稿）+ 量化预期（篇数/档位/产物/未获取比例/总时长量级）。告知后即开预调研，清单确认后才获取。顺带补 frontmatter version 同步（0.4.1 漏更）。纯 SKILL.md 条款。

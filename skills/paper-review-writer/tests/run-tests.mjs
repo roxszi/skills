@@ -344,6 +344,61 @@ const MATERIAL_3 = "## [01] 甲篇\n- 方法：x\n## [02] 乙篇\n- 方法：y\n
   fs.rmSync(bad, { recursive: true, force: true })
 }
 
+// ---------- export_html（第 5 步引擎）----------
+{
+  const dir = tmpProj()
+  // 1x1 PNG（最小合法位图，硬编码 base64 避免二进制 fixture）
+  const pngB64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+  fs.writeFileSync(path.join(dir, "fig.png"), Buffer.from(pngB64, "base64"))
+  const md = [
+    "# 测试综述",
+    "![图一](fig.png)",
+    "![远程](https://example.com/x.png)",
+    "![缺失](figures/09_x/fig_9.png)",
+    '<script src="https://cdn.example.com/x.js"></script>',
+    "",
+  ].join("\n")
+  const mdPath = path.join(dir, "综述.md")
+  fs.writeFileSync(mdPath, md, "utf8")
+  const { buildStandaloneHtml } = await import("../scripts/export_html.mjs")
+  const outPath = path.join(dir, "综述.html")
+  const r = await buildStandaloneHtml(mdPath, outPath)
+  assert("export-html 内嵌数=1", r.embedded === 1)
+  assert("export-html 外链数=1", r.external.length === 1)
+  assert("export-html 缺失数=1", r.missing.length === 1)
+  const html = readText(outPath)
+  assert("export-html 含 base64 data URI", html.includes("data:image/png;base64,"))
+  assert("export-html raw script 原样保留", html.includes('<script src="https://cdn.example.com/x.js"></script>'))
+  assert("export-html 引擎不新增脚本", (html.match(/<script/g) || []).length === 1)
+  assert("export-html 缺失引用原样保留", html.includes('src="figures/09_x/fig_9.png"'))
+  fs.rmSync(dir, { recursive: true, force: true })
+}
+
+// ---------- export_html：B1 项目根基准（缺省 deliverables/ 布局）+ W5 畸形 % 降级 ----------
+{
+  const dir = tmpProj()
+  const pngB64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+  // 缺省布局：图在 <项目根>/figures/，综述在 <项目根>/deliverables/（md 引用相对项目根书写）
+  fs.mkdirSync(path.join(dir, "figures", "03_x"), { recursive: true })
+  fs.writeFileSync(path.join(dir, "figures", "03_x", "fig_1.png"), Buffer.from(pngB64, "base64"))
+  fs.mkdirSync(path.join(dir, "deliverables"), { recursive: true })
+  const md2Path = path.join(dir, "deliverables", "综述.md")
+  fs.writeFileSync(md2Path, "# t\n\n![图](figures/03_x/fig_1.png)\n", "utf8")
+  const { buildStandaloneHtml } = await import("../scripts/export_html.mjs")
+  const r2 = await buildStandaloneHtml(md2Path, path.join(dir, "deliverables", "综述.html"), { imgBaseDir: dir })
+  assert("export-html imgBaseDir 项目根基准", r2.embedded === 1)
+  assert("export-html imgBaseDir 零缺失", r2.missing.length === 0)
+  // 畸形 % 序列：decodeURIComponent 抛 URIError，须单图降级为 missing 而非炸整次导出
+  const md3Path = path.join(dir, "综述3.md")
+  fs.writeFileSync(md3Path, "# t\n\n![坏](fig.png%zz)\n", "utf8")
+  let threw3 = false
+  let r3
+  try { r3 = await buildStandaloneHtml(md3Path, path.join(dir, "综述3.html")) } catch { threw3 = true }
+  assert("export-html 畸形%不炸导出", !threw3)
+  assert("export-html 畸形%降级 missing", r3 && r3.missing.length === 1)
+  fs.rmSync(dir, { recursive: true, force: true })
+}
+
 /** 运行一个会自行设置 exitCode 的命令函数，返回进程退出码 */
 async function runCmd(fn) {
   const prev = process.exitCode

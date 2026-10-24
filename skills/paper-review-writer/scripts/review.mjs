@@ -10,6 +10,7 @@ import {
   cmdAssemble, cmdBrief, cmdCheck, cmdDigest, cmdDispatch, cmdExtract, cmdInit, cmdInitSummaries,
   cmdMap, cmdMaterial, cmdSave, cmdValidate,
 } from "./pipeline.mjs"
+import { cmdFigures, cmdExportHtml } from "./delivery.mjs"
 
 const USAGE = `paper-review-writer — 批量文献调研综述流水线
 
@@ -31,6 +32,9 @@ const USAGE = `paper-review-writer — 批量文献调研综述流水线
   map [--out X]     文献映射章（条目 + 题录作者合流）→ deliverables/sections/09_文献映射.md
   dispatch [--batch N] [--context X]
                     精读派发任务单（待派队列 + 每篇任务卡全文）→ deliverables/dispatch.md
+  figures [--id]    第 3.4 步·图表提取：逐篇跑两段提图链路 → figures/{id}_{slug}/fig_N.png + manifest
+  export-html [--review X]
+                    第 5 步·一键自包含 HTML：综述 md（缺省 deliverables/综述.md）→ 同名 .html（图片 base64 内嵌，零外链，独立可重入）
 
 通用参数：
   --project <目录>  项目根目录（缺省当前目录）
@@ -78,6 +82,8 @@ async function main() {
     case "check": return cmdCheck(root, args)
     case "map": return cmdMap(root, args)
     case "dispatch": return cmdDispatch(root, args)
+case "figures": return cmdFigures(root, args)
+case "export-html": return cmdExportHtml(root, args)
     default:
       console.log(USAGE)
       if (args._ && args._ !== "help") process.exitCode = 2
