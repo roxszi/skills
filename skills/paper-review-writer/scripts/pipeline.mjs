@@ -8,7 +8,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { clean, clip, DIRS, ensureDir, log, pPath, readJson, readText, slugify, writeJson, writeText } from "./lib.mjs"
 import { validateSummary, validateMeta } from "./schema.mjs"
-import { fetchEpmcXmlText, loadProject } from "./sources.mjs"
+import { assertFreshVerify, fetchEpmcXmlText, loadProject, normalizeDoi } from "./sources.mjs"
 
 /* ---------- extract：PDF → 逐页文本 ---------- */
 
@@ -67,7 +67,7 @@ export function figureContexts(pages, maxFigures = 10, span = 400) {
 /** extract 子命令：全部 PDF → papers_txt/{id}.txt；无 PDF 且有 PMCID 的走 EPMC XML 降级 */
 export async function cmdExtract(root, args) {
   const cfg = loadProject(root)
-  const verified = readJson(pPath(root, "papers_meta.verified.json"))
+  const verified = assertFreshVerify(root)
   const meta = verified || readJson(pPath(root, "papers_meta.json"))
   if (!meta?.papers) throw new Error("缺 papers_meta（先建清单）")
   const papersDir = pPath(root, DIRS.papers)
@@ -208,10 +208,13 @@ export function cmdBrief(root) {
   const sumDir = pPath(root, DIRS.summaries)
   const digDir = ensureDir(pPath(root, DIRS.digests))
   const files = fs.existsSync(sumDir) ? fs.readdirSync(sumDir).filter(n => n.endsWith(".json")).sort() : []
+  const ghosts = ghostIds(root)
+  if (ghosts.length) log(`⚠ 排除不在当前清单的幽灵条目（清单修剪/改号残留，可删除对应 summary 文件）：${ghosts.join("、")}`)
   const lines = []
   for (const name of files) {
     const s = readJson(pPath(sumDir, name))
     if (!s || typeof s !== "object") continue
+    if (ghosts.includes(String(s.id))) continue
     const statusZh = { full_read: "全文已读", partial_read: "部分精读", abstract_only: "仅摘要", missing: "未获取" }[s.read_status] || s.read_status
     const one = (field, n) => (s[field] ? clip(s[field], n) : "—")
     const m0 = Array.isArray(s.performance_metrics) && s.performance_metrics[0]
@@ -225,6 +228,38 @@ export function cmdBrief(root) {
 }
 
 /* ---------- save：子会话条目落盘 ---------- */
+
+/** 条目 ↔ 清单绑定校验：同编号但 DOI/题名与当前清单不符 = 引用错位（2026-10-26 实战静默缺陷：
+ *  清单修剪改号后 save/validate/check 各自全绿但引用张冠李戴）。DOI 不一致报 error（强信号，
+ *  不允许 --allow-errors 豁免）；题名前缀不一致报 warning（子会话可能规范化写法，交人工复核）。 */
+export function checkIdBinding(s, metaPapers) {
+  const errors = []
+  const warnings = []
+  if (!s || !Array.isArray(metaPapers)) return { errors, warnings }
+  const p = metaPapers.find(x => String(x?.id) === String(s.id))
+  if (!p) return { errors, warnings } // 清单外的幽灵条目由 brief/material 的排除逻辑单独处理
+  const d1 = normalizeDoi(s.doi)
+  const d2 = normalizeDoi(p.doi)
+  if (d1 && d2 && d1 !== d2) errors.push(`编号 ${s.id} 的 DOI（${s.doi}）与当前清单（${p.doi}）不一致：编号与论文错位，核对该条目后重写`)
+  const t1 = String(s.title_en || "").trim().toLowerCase().slice(0, 80)
+  const t2 = String(p.title || "").trim().toLowerCase().slice(0, 80)
+  if (t1 && t2 && t1 !== t2) warnings.push("title_en 与当前清单题名前缀不一致，人工核对是否同一篇")
+  return { errors, warnings }
+}
+
+/** 幽灵条目检测：summaries/ 里有落盘但不在当前清单的编号（清单修剪/改号后的残留）。其内容属于
+ *  旧编号空间，混入素材包与简报 = 引用错位，brief/material 一律排除并在输出中列出。 */
+function ghostIds(root) {
+  const meta = readJson(pPath(root, "papers_meta.json"))
+  if (!meta?.papers) return []
+  const ids = new Set(meta.papers.map(p => String(p.id)))
+  const sumDir = pPath(root, DIRS.summaries)
+  if (!fs.existsSync(sumDir)) return []
+  return fs.readdirSync(sumDir)
+    .filter(n => /^summary_[0-9A-Za-z_-]+\.json$/.test(n))
+    .map(n => path.basename(n, ".json").replace(/^summary_/, ""))
+    .filter(id => !ids.has(id))
+}
 
 /** save 子命令：stdin JSON → 校验 → summaries/summary_{id}.json（单行输出防回显全文） */
 export async function cmdSave(root, args) {
@@ -246,7 +281,12 @@ export async function cmdSave(root, args) {
   }
   data.id = String(args.id)
   const { errors, warnings } = validateSummary(data)
-  if (errors.length && !args.allowErrors) {
+  // 编号绑定守护：DOI 错位不允许 --allow-errors 豁免（错位条目会污染引用闭环，比缺字段严重）
+  const meta = readJson(pPath(root, "papers_meta.json"))
+  const bind = checkIdBinding(data, meta?.papers || [])
+  errors.push(...bind.errors)
+  warnings.push(...bind.warnings)
+  if (errors.length && (!args.allowErrors || bind.errors.length)) {
     console.log("ERROR " + errors.join("; "))
     process.exitCode = 1
     return
@@ -275,11 +315,17 @@ export function cmdMaterial(root) {
     return
   }
   const statusZh = { full_read: "全文已读", partial_read: "部分精读", abstract_only: "仅摘要", missing: "未获取" }
+  const ghosts = ghostIds(root)
+  if (ghosts.length) log(`⚠ 排除不在当前清单的幽灵条目（清单修剪/改号残留，其内容混入会错位引用）：${ghosts.join("、")}`)
   const blocks = []
   const skipped = []
   for (const name of files) {
     const s = readJson(pPath(sumDir, name))
     if (!s || typeof s !== "object") continue
+    if (ghosts.includes(String(s.id))) {
+      skipped.push(`${s.id}（不在当前清单，已排除）`)
+      continue
+    }
     const { errors, warnings } = validateSummary(s)
     if (errors.length) {
       // 带 error 的条目不进素材包：综述引用一个坏条目会污染全篇结论
@@ -334,6 +380,9 @@ export function cmdAssemble(root, args) {
     console.log("FAIL sections/ 无 .md 章节文件")
     process.exitCode = 1
     return
+  }
+  if (!files.some(n => /文献映射|参考文献|references/i.test(n))) {
+    console.log("WARN sections/ 未发现文献映射章（map 子命令生成 09_文献映射.md）：先跑 map 再 assemble，否则 check 因缺章 FAIL")
   }
   const parts = []
   for (const n of files) {
@@ -514,8 +563,8 @@ export function cmdInitSummaries(root) {
   const errors = validateMeta(meta).errors
   if (errors.length) throw new Error("papers_meta.json 校验失败：" + errors.join("; "))
   const sumDir = ensureDir(pPath(root, DIRS.summaries))
-  // 摘要回填源：verify 产物里 EPMC/Crossref 已带 abstract（init-summaries 建模板时写入，已有条目缺则补填）
-  const verified = readJson(pPath(root, "papers_meta.verified.json"))
+  // 摘要回填源：verify 产物里 EPMC/Crossref/OpenAlex 已带 abstract（init-summaries 建模板时写入，已有条目缺则补填）
+  const verified = assertFreshVerify(root)
   const vMap = new Map((verified?.papers || []).map(p => [String(p.id), p]))
   let n = 0
   let backfill = 0
@@ -523,7 +572,7 @@ export function cmdInitSummaries(root) {
     const pid = String(p.id)
     const f = pPath(sumDir, `summary_${pid}.json`)
     const vp = vMap.get(pid)
-    const abstractEn = vp?.verified?.europepmc?.abstract || vp?.verified?.crossref?.abstract || ""
+    const abstractEn = vp?.verified?.europepmc?.abstract || vp?.verified?.crossref?.abstract || vp?.verified?.openalex?.abstract || ""
     if (fs.existsSync(f)) {
       // 已存在：仅补填缺失的 abstract_en，不动其他字段
       if (abstractEn) {
@@ -559,10 +608,15 @@ export function cmdValidate(root, args) {
     process.exitCode = 1
     return
   }
+  const meta = readJson(pPath(root, "papers_meta.json"))
   let bad = 0
   for (const name of names) {
     const s = readJson(pPath(sumDir, name))
     const { errors, warnings } = validateSummary(s)
+    // 编号绑定守护：与当前清单逐条比对（同编号不同 DOI = 2026-10-26 实战静默缺陷）
+    const bind = checkIdBinding(s, meta?.papers || [])
+    errors.push(...bind.errors)
+    warnings.push(...bind.warnings)
     if (errors.length) bad++
     const tag = errors.length ? "ERROR" : warnings.length ? "WARN" : "OK"
     const detail = [...errors, ...warnings].join("; ")
@@ -585,7 +639,7 @@ export function cmdValidate(root, args) {
  * --out 接文件名时拼进 sections/（缺省 09_文献映射.md），接绝对路径时直用（与 assemble 语义一致）；
  * 文件名扫描字符集与 check 编号契约同集（[0-9A-Za-z_-]），排序用自然序防 summary_100 排到 summary_20 前。 */
 export function cmdMap(root, args) {
-  const verified = readJson(pPath(root, "papers_meta.verified.json"))
+  const verified = assertFreshVerify(root)
   if (!verified?.papers) throw new Error("papers_meta.verified.json 不存在：先跑 verify")
   if (!Array.isArray(verified.papers) || !verified.papers.length) throw new Error("论文清单为空：先跑 init 生成非空清单")
   const sumDir = pPath(root, DIRS.summaries)
@@ -621,7 +675,7 @@ export function cmdMap(root, args) {
  * 单次输出的任务卡张数（标准档 2，非法值统一回落 2）；回收判定与 SKILL.md §4 一致：
  * 条目存在且非 missing 且 validateSummary 无 error；有 error 的归待修，不计入已回收。 */
 export function cmdDispatch(root, args) {
-  const meta = readJson(pPath(root, "papers_meta.verified.json")) || readJson(pPath(root, "papers_meta.json"))
+  const meta = assertFreshVerify(root) || readJson(pPath(root, "papers_meta.json"))
   if (!meta?.papers) throw new Error("论文清单不存在：先跑 init / verify")
   if (!Array.isArray(meta.papers) || !meta.papers.length) throw new Error("论文清单为空：先跑 init 生成非空清单")
   const sumDir = pPath(root, DIRS.summaries)

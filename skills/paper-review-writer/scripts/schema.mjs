@@ -100,7 +100,8 @@ export function validateSummary(s) {
   }
   const status = s.read_status
   if (status !== undefined && !READ_STATUSES.includes(status)) {
-    errors.push(`read_status 非法：${JSON.stringify(status)}，允许值 ${READ_STATUSES.join(" / ")}`)
+    // 错误信息内嵌中文含义与旧称对照（L1/L2），降低迁移成本
+    errors.push(`read_status 非法：${JSON.stringify(status)}，允许值 full_read（全文已读，旧称 L2）/ partial_read（部分精读，旧称 L1）/ abstract_only（仅摘要）/ missing（未获取）`)
   }
   // depth_reassessment：缺失仅对已产生阅读行为的条目提醒（missing/未获取不报，初始化模板保持干净）；verdict 非法才拦截
   if (s.depth_reassessment === undefined || s.depth_reassessment === null) {

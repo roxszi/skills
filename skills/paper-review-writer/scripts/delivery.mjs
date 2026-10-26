@@ -15,16 +15,17 @@ import path from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 import { buildStandaloneHtml } from "./export_html.mjs"
+import { assertFreshVerify } from "./sources.mjs"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
-/** 读清单：verified 优先，回退原始清单 */
+/** 读清单：verified 优先（过清单指纹守护，防提图挂在错位编号上），回退原始清单 */
 function loadMeta(root) {
-  for (const name of ["papers_meta.verified.json", "papers_meta.json"]) {
-    const p = path.join(root, name)
-    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, "utf8"))
-  }
-  throw new Error(`清单不存在：${path.join(root, "papers_meta.json")}（先跑 init 与 verify）`)
+  const verified = assertFreshVerify(root)
+  if (verified?.papers) return verified
+  const p = path.join(root, "papers_meta.json")
+  if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, "utf8"))
+  throw new Error(`清单不存在：${p}（先跑 init 与 verify）`)
 }
 
 /** pdf 文件名 → 输出目录 slug：去 {id}_ 前缀与 .pdf，截 40 字符 */

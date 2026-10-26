@@ -6,7 +6,8 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { validateMeta, validateSummary } from "../scripts/schema.mjs"
-import { cmdAssemble, cmdDigest, cmdBrief, cmdMaterial, cmdCheck, cmdValidate, cmdInitSummaries, cmdMap, cmdDispatch, figureIndex, figureContexts } from "../scripts/pipeline.mjs"
+import { cmdAssemble, cmdDigest, cmdBrief, cmdMaterial, cmdCheck, cmdValidate, cmdInitSummaries, cmdMap, cmdDispatch, checkIdBinding, figureIndex, figureContexts } from "../scripts/pipeline.mjs"
+import { assertFreshVerify, invertedToAbstract, metaFingerprint, normalizeDoi, openalexBatchFilter, publisherUrls } from "../scripts/sources.mjs"
 import { writeJson, writeText, readText, readJson } from "../scripts/lib.mjs"
 
 const results = []
@@ -455,6 +456,98 @@ const MATERIAL_3 = "## [01] 甲篇\n- 方法：x\n## [02] 乙篇\n- 方法：y\n
   const health = cmdDoctor()
   assert("doctor 六行（node + 五依赖）", health.rows.length === 6)
   assert("doctor 全绿", health.allOk === true)
+}
+
+// ---------- 0.6.0 主键守护与网络层纯函数（2026-10-26 教育网实跑复盘驱动） ----------
+{
+  // 指纹：同清单稳定；增删/改号/换序任一都变
+  const papers3 = [{ id: "01", title: "A", doi: "10.1/a" }, { id: "02", title: "B", doi: "10.1/b" }, { id: "03", title: "C", doi: "10.1/c" }]
+  assert("metaFingerprint 同清单稳定", metaFingerprint(papers3) === metaFingerprint([{ id: "01", title: "A", doi: "10.1/a" }, { id: "02", title: "B", doi: "10.1/b" }, { id: "03", title: "C", doi: "10.1/c" }]))
+  assert("metaFingerprint 删中间项即变", metaFingerprint(papers3) !== metaFingerprint(papers3.filter((_, i) => i !== 1)))
+  assert("metaFingerprint 换序即变", metaFingerprint(papers3) !== metaFingerprint([...papers3].reverse()))
+
+  // 新鲜度守护：新产物指纹不一致 → 抛错；旧产物逐篇退化比对（一致放行 / DOI 错位抛错）
+  const projF = tmpProj()
+  writeJson(path.join(projF, "papers_meta.json"), { papers: papers3 })
+  writeJson(path.join(projF, "papers_meta.verified.json"), { meta_fingerprint: metaFingerprint([{ id: "01", title: "A" }]), papers: papers3 })
+  let threwF = ""
+  try { assertFreshVerify(projF) } catch (e) { threwF = e.message }
+  assert("指纹不一致抛错并指明重跑 verify", threwF.includes("不一致") && threwF.includes("verify"))
+  writeJson(path.join(projF, "papers_meta.verified.json"), { papers: papers3.map(p => ({ ...p, verified: {} })) })
+  assert("旧产物逐篇一致放行", ((assertFreshVerify(projF) || {}).papers || []).length === 3)
+  writeJson(path.join(projF, "papers_meta.verified.json"), {
+    papers: [{ id: "01", title: "A", doi: "10.1/a" }, { id: "02", title: "B", doi: "10.1/OTHER" }, { id: "03", title: "C", doi: "10.1/c" }],
+  })
+  threwF = ""
+  try { assertFreshVerify(projF) } catch (e) { threwF = e.message }
+  assert("旧产物同 id 不同 DOI 抛错", threwF.includes("02") && threwF.includes("DOI"))
+  assert("normalizeDoi 归一化", normalizeDoi("HTTPS://DOI.org/10.1/X") === "10.1/x")
+  fs.rmSync(projF, { recursive: true, force: true })
+
+  // 条目 ↔ 清单绑定：DOI 错位 error（不可豁免）、题名前缀不一致 warning、DOI 归一化后一致放行
+  const metaPapers = [{ id: "01", title: "Raman detection of lead ions", doi: "10.1/lead" }]
+  const b1 = checkIdBinding({ id: "01", title_en: "Raman detection of lead ions", doi: "10.1/wrong" }, metaPapers)
+  const b2 = checkIdBinding({ id: "01", title_en: "Another paper entirely", doi: "10.1/lead" }, metaPapers)
+  const b3 = checkIdBinding({ id: "01", title_en: "Raman detection of lead ions", doi: "https://doi.org/10.1/LEAD" }, metaPapers)
+  assert("绑定 DOI 错位报 error", b1.errors.length === 1 && b1.warnings.length === 0)
+  assert("绑定题名不一致报 warning", b2.warnings.length === 1 && !b2.errors.length)
+  assert("绑定 DOI 归一化后一致放行", !b3.errors.length && !b3.warnings.length)
+
+  // 出版商直链：MDPI 从题录结构字段拼、Elsevier 恒不进表、Springer 用 content/pdf
+  const mdpi = publisherUrls("10.3390/coatings8110394", { journal: "Coatings", volume: "8", article_number: "394" })
+  assert("MDPI 存档域按题录卷号文章号拼链", mdpi.some(u => u.includes("mdpi-res.com/d_attachment/coatings/coatings-08-00394/")))
+  assert("MDPI 不从 DOI 尾段硬拆卷号", !mdpi.some(u => u.includes("coatings-81-")))
+  assert("MDPI 缺题录结构字段时放弃", publisherUrls("10.3390/coatings8110394", null).length === 0)
+  // 刊名缩写优先（short-container-title）：存档域目录用缩写，全拼恒 404（IJMS 实测 ijms-24-08490，Coatings 200 只是全拼=缩写巧合）
+  const mdpiShort = publisherUrls("10.3390/ijms24108490", { journal: "International Journal of Molecular Sciences", short_container_title: "IJMS", volume: "24", page: "8490" })
+  assert("MDPI 刊名取 short-container-title 缩写", mdpiShort.some(u => u.includes("mdpi-res.com/d_attachment/ijms/ijms-24-08490/")) && !mdpiShort.some(u => u.includes("internationaljournal")))
+  // article-number 缺失时 page 回退（MDPI 真实记录形态：article-number 空、page 即文章号，如 Coatings 394 / IJMS 8490）
+  const mdpiPage = publisherUrls("10.3390/coatings8110394", { journal: "Coatings", volume: "8", page: "394" })
+  assert("MDPI article_number 缺失时 page 回退拼链", mdpiPage.some(u => u.includes("coatings-08-00394")))
+  assert("Elsevier 不进脚本直链表（DOI 尾段非 PII + IP 封禁）", publisherUrls("10.1016/j.snb.2015.07.001", null).length === 0)
+  const spr = publisherUrls("10.1007/x", null)
+  assert("Springer 首候选 content/pdf", spr[0] === "https://link.springer.com/content/pdf/10.1007/x.pdf")
+
+  // OpenAlex 摘要倒排还原与批量 OR 过滤串
+  assert("倒排索引按位置还原摘要", invertedToAbstract({ world: [1], Hello: [0] }) === "Hello world")
+  assert("倒排索引空输入返回空串", invertedToAbstract(null) === "" && invertedToAbstract({}) === "")
+  const fBatch = openalexBatchFilter(["HTTPS://DOI.org/10.1/A", "10.1/b"])
+  assert("批量 OR 过滤串归一化拼接", fBatch === "doi:https://doi.org/10.1/a|https://doi.org/10.1/b")
+
+  // schema read_status 错误信息内嵌 L1/L2 对照
+  const { errors: rsErrors } = validateSummary({ ...GOOD_SUMMARY, id: "09", read_status: "bogus" })
+  assert("read_status 错误信息含 L1/L2 对照", rsErrors.some(e => e.includes("L2") && e.includes("L1")))
+
+  // 幽灵条目：不在当前清单的残留条目被 brief/material 排除并提示
+  const projG = tmpProj()
+  writeJson(path.join(projG, "papers_meta.json"), { papers: [{ id: "01", title: "A" }, { id: "02", title: "B" }] })
+  writeJson(path.join(projG, "summaries", "summary_01.json"), GOOD_SUMMARY)
+  writeJson(path.join(projG, "summaries", "summary_09.json"), { ...GOOD_SUMMARY, id: "09" })
+  cmdBrief(projG)
+  cmdMaterial(projG)
+  const briefG = readText(path.join(projG, "digests", "brief.md")) || ""
+  const matG = readText(path.join(projG, "review-material.md")) || ""
+  assert("brief 排除幽灵条目", briefG.includes("[01|") && !briefG.includes("[09|"))
+  assert("素材包排除幽灵条目并在包头列出", !matG.includes("## [09]") && matG.includes("## [01]") && matG.includes("09（不在当前清单"))
+  fs.rmSync(projG, { recursive: true, force: true })
+
+  // assemble 缺文献映射章给 WARN（不阻断拼装，check 会拦）
+  const projA = tmpProj()
+  writeText(path.join(projA, "deliverables", "sections", "01_背景.md"), "# 1. 研究背景与问题定义\n正文")
+  const logsA = []
+  const origLog = console.log
+  console.log = (...a) => logsA.push(a.join(" "))
+  try { cmdAssemble(projA, {}) } finally { console.log = origLog }
+  assert("assemble 缺映射章 WARN 提示先跑 map", logsA.some(l => String(l).includes("WARN") && String(l).includes("map")))
+  assert("assemble 拼装不受 WARN 影响", (readText(path.join(projA, "deliverables", "综述.md")) || "").includes("正文"))
+  fs.rmSync(projA, { recursive: true, force: true })
+
+  // crossrefDoi 不携带 select（/works/{doi} 端点不支持，400 parameter-not-allowed）：源码级静态守卫
+  {
+    const src = fs.readFileSync(new URL("../scripts/sources.mjs", import.meta.url), "utf8")
+    const fn = (src.match(/async function crossrefDoi[\s\S]*?\n\}/) || [""])[0].replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")
+    assert("crossrefDoi 不使用 select 参数", fn.length > 0 && !fn.includes("select"))
+  }
 }
 
 /** 运行一个会自行设置 exitCode 的命令函数，返回进程退出码 */

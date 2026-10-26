@@ -2,6 +2,20 @@
 
 > 本文件面向 skill 编写者：版本演进、设计取舍、致谢声明记录于此。使用者业务闭环不需要读本文件；SKILL.md 正文不携带版本历史。
 
+## 0.6.0（2026-10-26）
+
+- **外部实跑复盘驱动轮**（CherryStudio-Pi 宿主 + 教育网环境全流水线实跑 Pb²⁺ 综述 117 篇，迭代建议报告 261026A；网络层加固 + 主键守护，纪律层结构未动）：
+  - **编号绑定守护（P0 静默缺陷修复）**：实跑暴露「清单 117→106 修剪改号后未重跑 verify，核验产物按数组下标错位 113/117 条，save/validate/check 全绿但综述引用张冠李戴」。修复三层：①verify 产物顶部落 `meta_fingerprint`（id+title+doi 稳定序列化短哈希），download / extract / init-summaries / map / dispatch / figures 读核验产物前统一过 `assertFreshVerify`，指纹不一致即报错并指引重跑（旧产物无指纹时退化为逐篇 DOI/题名前缀比对，向后兼容）；②`save`/`validate` 新增 `checkIdBinding`（条目 DOI 与当前清单不一致报 error 且不允许 --allow-errors 豁免，题名前缀不一致报 warning）；③`brief`/`material` 排除不在当前清单的幽灵条目并在输出中列出（其内容属旧编号空间，混入即错位引用）。
+  - **检索源纪律（P0）**：预调研主源改为文献 API（EPMC/Crossref/OpenAlex 检索端点），web_search 降为辅助且单次失败不重试（宿主检索 provider 独立故障率，实测 22 次 7 败）；分析物同义词括号包裹成组（写法差异造成 1–2 个数量级漏检）+ 术语覆盖率自检（每组查询命中 >100 否则告警）。SKILL.md §0。
+  - **出版商 IP 封禁分类（P0）**：停点 2 分类表与 playbook §5 新增该类（特征：CPE00001 / 列出 IP Address / robot 文案无验证码控件；放行无用，第一处置换网络出口）；playbook 新增 §7 三通路轮换（直连脚本 → 浏览器 → 宿主 web_fetch，签名随通路变化的判读法）；§0 获取环境表述改带条件（校园网提升直取率但防不了 IP 段封禁）。
+  - **OpenAlex 预算自适应（P1）**：verify 单条路径遇 429/504 即置降级标记（教育网整校共享免费预算），剩余篇目转批量 OR 补拉（单 filter 内 `|` ≤50 DOI/批，官方限 100）；OA_SELECT 增 `abstract_inverted_index` 并还原为摘要（OpenAlex 摘要覆盖与 EPMC 互补，117 篇并集 99），init-summaries 摘要回填链变三源；`project.json` 新增 `apis.openalex_key`（配额约 ×10），停点 1 问询顺带索取。
+  - **S2 接入（P1）**：verify 增 Semantic Scholar 源（openAccessPdf 是 closed 文献机构库合法副本唯一系统来源），429 即会话级熔断不空烧；下载候选链中排第二仅次用户手给（src=s2-oa）；核验链描述四源→五源。
+  - **出版商端点修正（P1）**：MDPI 存档域直链（mdpi-res.com，按 Crossref volume/article-number 拼链，crossrefDoi 增提 volume/article_number/page 三字段；DOI 尾段硬拆卷号会 404）；Springer 首候选改 content/pdf（实测 200）；删除恒无效的 Elsevier sciencedirect 拼链（DOI 尾段非 PII，旧 URL 从未成立过）。新 `references/external-api-notes.md`：学术 API 契约反直觉事实 + 出版商端点表，全部带实测日期，规则增量维护不依赖改代码认知。
+  - **杂项（P2）**：assemble 缺文献映射章时 WARN 提示先跑 map，SKILL.md §5.2 写死 map→assemble→check 顺序；read_status 错误信息内嵌中文含义与 L1/L2 对照（契约文档同步）；Unpaywall 邮箱表述纠正（实测占位邮箱也能返回，改「礼貌池与统计口径要求」）；playbook 等待动作改能力语言（宿主 REPL 无 setTimeout）；§1 适配表依赖安装位置二选一 + 托管同步区 lockfile 不入库；crossrefDoi 注明本端点不支持 select（防后续「优化」踩 400）。
+  - **顺延项**：`citations` 子命令（OpenAlex cites 过滤器做引用网络分析）按报告自评时机顺延，待实战触发再落地；能力入口已在 external-api-notes §A 记录。
+  - 回归 80 → 104 断言（指纹稳定性/新鲜度守护新旧产物双路/绑定校验三分/MDPI 拼链与不猜/Elsevier 不进表/Springer 首候选/倒排还原/批量过滤串/L1L2 错误信息/幽灵排除 brief+material/assemble WARN/crossref select 静态守卫），全过退出码 0。
+  - **码农虾独立审查轮（同日，11 个文件全查 + 6 脚本逐行审）**：抓中严重度 1 例并已修——MDPI 存档域直链刊名原取 container-title 全拼，实测存档域目录用刊名缩写（IJMS 存档域名 = ijms，全拼恒 404；Coatings 200 只是全拼=缩写巧合，测试 fixture 恰用 Coatings 未暴露），改 short-container-title 优先、缺字段回退全拼，crossrefDoi 增提 short_container_title，external-api-notes §B 同步；回归 104 → 106（新增缩写正负向断言 + page 回退断言）。低严重度 4 项记录在案不改（MDPI page 为真实页码范围时拼无效候选但 tryDownload 兜底 / verify 批量补拉 byDoi 同 DOI 覆盖且不查重 / 三处测试覆盖缺口 / s2 熔断后跳过篇数无汇总）；附注 4 项（map 作者回退死路径 0.5.x 旧问题无加重 / cmdVerify O(n²) 无感 / 任务单 schema.mjs 表述与实际消费点不符，无功能问题 / 测试尾部 %zz 残留为已知异步 stderr 竞态）。审查方教训：探测硬事实必须用真实数据源检索，手造 DOI 探测必 404。
+
 ## 0.5.4（2026-10-26）
 
 - **第 0 步·启动确认**（修复启动告知的送达时序缺陷：宿主通常只在整轮结束向用户投递消息，「告知后即开预调研」的实际效果 = 预调研跑完后流程说明才与命中结果同轮送达，告知的确认价值归零）：新项目首轮只做三件事——汇总需求理解（主题/范围/时间跨度/篇数/分组预判 + 待补充信息）、告知五步流程与 tips、申报量化预期与档位；发完即停轮等用户确认，确认后才开跑预调研。强制停点两处 → 三处（新增停点 0 启动确认；原停点 1/2 编号不变，§3.4/§4 交叉引用零改动）。豁免：会话接续与第 5 步独立重入不经第 0 步；简化路径同样先走第 0 步。§6 加红线兜底。纯 SKILL.md 条款，脚本零改动。

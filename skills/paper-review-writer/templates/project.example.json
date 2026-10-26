@@ -1,6 +1,8 @@
 {
   "apis": {
-    "mailto": "你的真实邮箱（Unpaywall 必须真实邮箱才返回数据）"
+    "mailto": "你的真实邮箱（公共 API 礼貌池要求；占位邮箱实测也能返回数据，但正式项目不用假邮箱）",
+    "openalex_key": "",
+    "_说明": "openalex_key 可选：OpenAlex 无 key 配额按网络出口 IP 全网共享（教育网整校一池），带 key 日预算约 10 倍；不填也能跑（verify 遇 429/504 自动转批量补拉）"
   },
   "compliance": {
     "allow_third_party": false,

@@ -21,7 +21,7 @@ const USAGE = `paper-review-writer — 批量文献调研综述流水线
 
 流水线子命令（按阶段顺序）：
   init              建项目骨架（目录 + 模板文件，已存在不覆盖）
-  verify            元数据核验（Crossref/OpenAlex/Europe PMC/Unpaywall）→ papers_meta.verified.json
+  verify            元数据核验（Crossref/OpenAlex/S2/Europe PMC/Unpaywall，带清单指纹）→ papers_meta.verified.json
   download [--id]   合规下载（OA 链优先；③档白名单自动；④档第三方默认关）→ papers/*.pdf
   extract [--id]    PDF 逐页文本（EPMC XML 降级）→ papers_txt/*.txt
   digest [--id]     精读缓冲（≤2.6KB/篇，含图题索引）→ digests/*.md
