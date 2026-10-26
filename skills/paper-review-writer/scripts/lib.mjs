@@ -123,3 +123,30 @@ export async function fetchWithTimeout(url, options = {}, timeoutMs = 45000) {
 export function log(msg) {
   console.log(`[review] ${msg}`)
 }
+
+/* ---------- 运行报告（runs/last.json；review.mjs 入口层在 finally 统一收口，业务函数零侵入） ---------- */
+
+/** 子命令运行报告落盘：每次覆盖写 runs/last.json。根目录不存在时静默跳过——init 前的参数
+ *  错误等场景无项目可挂，报告不得凭空造出项目目录树，也不得掩盖主流程错误。 */
+export function writeRunReport(root, report) {
+  try {
+    if (!root || !fs.existsSync(root)) return
+    writeJson(pPath(root, "runs", "last.json"), report)
+  } catch {
+    /* 排障报告写失败不影响主流程 */
+  }
+}
+
+/** 错误分类：中文类目直接可读（夜间挂机次晨读 last.json 即知错在哪一层）。
+ *  顺序即优先级：code 级（模块 / 权限 / 空间）→ 网络限流 → 输入校验 → 参数缺失 → 其他兜底。 */
+export function classifyError(e) {
+  const code = String((e && e.code) || "")
+  const msg = String((e && e.message) || e)
+  if (code === "ERR_MODULE_NOT_FOUND" || code === "MODULE_NOT_FOUND") return "依赖缺失"
+  if (code === "EACCES" || code === "EPERM" || code === "EBUSY") return "文件权限或占用"
+  if (code === "ENOSPC") return "磁盘空间不足"
+  if (/fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|\b429\b|\b403\b|超时|timeout/i.test(`${msg} ${code}`)) return "网络或限流"
+  if (/校验失败|校验有|不存在|清单为空/.test(msg)) return "输入校验"
+  if (/需要 --|必填|缺少参数/.test(msg)) return "参数缺失"
+  return "其他"
+}

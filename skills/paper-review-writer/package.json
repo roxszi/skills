@@ -1,6 +1,6 @@
 {
   "name": "paper-review-writer",
-  "version": "0.5.2",
+  "version": "0.5.4",
   "private": true,
   "type": "module",
   "description": "批量文献调研综述流水线：元数据核验 → 合规下载 → 全文提取 → 图表提取 → 并行精读条目 → 素材包 → 综述成文 → 自包含 HTML 导出",

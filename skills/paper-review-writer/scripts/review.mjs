@@ -1,10 +1,13 @@
-// review.mjs — 单入口 CLI（子命令分发）
+// review.mjs — 单入口 CLI（子命令分发 + 运行报告收口）
 // 用法：node review.mjs <子命令> --project <项目目录> [参数]
-// 子命令与流水线阶段一一对应，见 SKILL.md 第 3 节；本文件只做参数解析与分发，不含业务逻辑。
+// 子命令与流水线阶段一一对应，见 SKILL.md 第 3 节；本文件只做参数解析、分发与运行报告收口，
+// 不含业务逻辑。运行报告（runs/last.json）在 finally 统一落盘：夜间挂机中断后，次晨读它即知
+// 最后一次子命令停在哪一步、错在哪一层（错误分类中文值，见 lib.mjs classifyError）。
 
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { projectRoot } from "./lib.mjs"
+import { projectRoot, writeRunReport, classifyError } from "./lib.mjs"
+import { cmdDoctor } from "./doctor.mjs"
 import { cmdDownload, cmdVerify } from "./sources.mjs"
 import {
   cmdAssemble, cmdBrief, cmdCheck, cmdDigest, cmdDispatch, cmdExtract, cmdInit, cmdInitSummaries,
@@ -35,12 +38,19 @@ const USAGE = `paper-review-writer — 批量文献调研综述流水线
   figures [--id]    第 3.4 步·图表提取：逐篇跑两段提图链路 → figures/{id}_{slug}/fig_N.png + manifest
   export-html [--review X]
                     第 5 步·一键自包含 HTML：综述 md（缺省 deliverables/综述.md）→ 同名 .html（图片 base64 内嵌，零外链，独立可重入）
+  doctor            环境健康自检：node 版本 + 五依赖子进程冒烟（安装依赖后先跑一次，全绿再用）
 
 通用参数：
   --project <目录>  项目根目录（缺省当前目录）
   --id <编号>       只处理该论文（重试用）
   --allow-errors    save 时校验有错也落盘（不推荐）
   --allow-third-party  临时授权第三方渠道（默认关闭，显式开启才尝试）`
+
+/** 需要写运行报告（runs/last.json）的子命令集合；doctor（无项目语义）与无参帮助不写 */
+const REPORTED = new Set([
+  "init", "verify", "download", "extract", "digest", "init-summaries", "save", "validate",
+  "brief", "material", "assemble", "check", "map", "dispatch", "figures", "export-html",
+])
 
 /** 极简参数解析：--key value 与 --bool 两种形态 */
 function parseArgs(argv) {
@@ -60,10 +70,8 @@ function parseArgs(argv) {
   return args
 }
 
-async function main() {
-  const argv = process.argv.slice(2)
-  const args = parseArgs(argv)
-  const root = projectRoot(args)
+/** 子命令分发（业务入口；抛错上交 main 统一捕获分类） */
+function runCommand(args, root) {
   switch (args._) {
     case "init": return cmdInit(root)
     case "verify": return cmdVerify(root, args)
@@ -82,11 +90,46 @@ async function main() {
     case "check": return cmdCheck(root, args)
     case "map": return cmdMap(root, args)
     case "dispatch": return cmdDispatch(root, args)
-case "figures": return cmdFigures(root, args)
-case "export-html": return cmdExportHtml(root, args)
+    case "figures": return cmdFigures(root, args)
+    case "export-html": return cmdExportHtml(root, args)
+    case "doctor": return cmdDoctor()
     default:
       console.log(USAGE)
       if (args._ && args._ !== "help") process.exitCode = 2
+      return undefined
+  }
+}
+
+async function main() {
+  const argv = process.argv.slice(2)
+  const args = parseArgs(argv)
+  const root = projectRoot(args)
+  const startedAt = Date.now()
+  let errorClass = null
+  let errorMsg = null
+  try {
+    await runCommand(args, root)
+  } catch (e) {
+    errorMsg = String((e && e.message) || e)
+    errorClass = classifyError(e)
+    console.error(`[review] ERROR：${errorMsg}`)
+    process.exitCode = 1
+  } finally {
+    if (REPORTED.has(args._)) {
+      // 退出码失败形态：业务命令（save / validate / check / map 等）校验失败走 process.exitCode = 1
+      // 而不抛错，上方 catch 不触发——ok 必须综合退出码判定，否则 last.json 记 ok:true 与真实
+      // 退出状态矛盾，夜间挂机次晨会被误导为成功
+      const codeFailed = process.exitCode === 1
+      writeRunReport(root, {
+        subcommand: args._,
+        ok: !errorMsg && !codeFailed,
+        errorClass: errorClass || (codeFailed ? "业务校验" : null),
+        error: errorMsg || (codeFailed ? "子命令以退出码 1 结束（无异常抛出，失败详情见命令日志）" : null),
+        durationMs: Date.now() - startedAt,
+        project: root,
+        finishedAt: new Date().toISOString(),
+      })
+    }
   }
 }
 

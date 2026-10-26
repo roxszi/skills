@@ -399,6 +399,64 @@ const MATERIAL_3 = "## [01] 甲篇\n- 方法：x\n## [02] 乙篇\n- 方法：y\n
   fs.rmSync(dir, { recursive: true, force: true })
 }
 
+// ---------- 运行报告 CLI 集成：退出码失败形态也须如实记录（review.mjs finally 收口） ----------
+{
+  // 用真实 CLI 子进程验：save / validate / check / map 等失败走 process.exitCode = 1 而不抛错，
+  // main() 的 catch 不触发——若收口只看 errorMsg，last.json 会记 ok:true 与真实退出状态矛盾
+  const { spawnSync } = await import("node:child_process")
+  const { fileURLToPath } = await import("node:url")
+  const REVIEW = fileURLToPath(new URL("../scripts/review.mjs", import.meta.url))
+  const SKILL_ROOT = path.resolve(path.dirname(REVIEW), "..")
+  const spawnOpts = { cwd: SKILL_ROOT, encoding: "utf8", timeout: 60000 } // cwd=skill 根：依赖向上解析链与 doctor 冒烟同款约定
+  // 失败形态：year 越界条目 → validate 退出码 1（无异常抛出）→ last.json ok=false + 业务校验
+  const projBad = tmpProj()
+  writeJson(path.join(projBad, "summaries", "summary_01.json"), { ...GOOD_SUMMARY, year: 1850 })
+  const rBad = spawnSync(process.execPath, [REVIEW, "validate", "--project", projBad], spawnOpts)
+  const repBad = readJson(path.join(projBad, "runs", "last.json")) || {}
+  assert("CLI validate 退出码失败 last.json ok=false", rBad.status === 1 && repBad.ok === false)
+  assert("CLI validate 退出码失败 errorClass 业务校验", repBad.errorClass === "业务校验" && Boolean(repBad.error))
+  // 成功形态：好条目 → 退出码 0 → last.json ok=true（修复不得误伤成功路径）
+  const projGood = tmpProj()
+  writeJson(path.join(projGood, "summaries", "summary_01.json"), GOOD_SUMMARY)
+  const rGood = spawnSync(process.execPath, [REVIEW, "validate", "--project", projGood], spawnOpts)
+  const repGood = readJson(path.join(projGood, "runs", "last.json")) || {}
+  assert("CLI validate 成功 last.json ok=true", rGood.status === 0 && repGood.ok === true)
+  fs.rmSync(projBad, { recursive: true, force: true })
+  fs.rmSync(projGood, { recursive: true, force: true })
+}
+
+// ---------- doctor + 运行报告（最小 PDF / classifyError / writeRunReport / 集成冒烟全绿） ----------
+{
+  const { buildMinimalPdf, cmdDoctor } = await import("../scripts/doctor.mjs")
+  const { classifyError, writeRunReport } = await import("../scripts/lib.mjs")
+  // 最小样张字节结构：头 / 尾 / xref 对象数 / 样张文本
+  const pdfText = buildMinimalPdf().toString("latin1")
+  assert("doctor 最小 PDF 头尾合法", pdfText.startsWith("%PDF-1.4\n") && pdfText.trimEnd().endsWith("%%EOF"))
+  assert("doctor 最小 PDF 含样张文本", pdfText.includes("(SMOKE-OK) Tj"))
+  const xrefM = pdfText.match(/xref\n0 (\d+)\n/)
+  assert("doctor xref 对象数 = 6", Boolean(xrefM) && Number(xrefM[1]) === 6)
+  // classifyError 优先级映射（中文类目，用户可读）
+  const mkErr = (msg, code) => Object.assign(new Error(msg), code ? { code } : {})
+  assert("classifyError 依赖缺失（code 优先）", classifyError(mkErr("Cannot find modules", "ERR_MODULE_NOT_FOUND")) === "依赖缺失")
+  assert("classifyError 文件占用", classifyError(mkErr("resource busy", "EBUSY")) === "文件权限或占用")
+  assert("classifyError 网络与限流", classifyError(mkErr("fetch failed")) === "网络或限流" && classifyError(mkErr("请求 429 超限")) === "网络或限流")
+  assert("classifyError 输入校验", classifyError(mkErr("papers_meta.json 校验失败：x")) === "输入校验")
+  assert("classifyError 参数缺失", classifyError(mkErr("save 需要 --id <编号>")) === "参数缺失")
+  assert("classifyError 其他兑底", classifyError(mkErr("莫名其妙")) === "其他")
+  // writeRunReport：落盘 + 越界守护（根不存在不建目录不抛错）
+  const proj = tmpProj()
+  writeRunReport(proj, { subcommand: "init", ok: true, errorClass: null })
+  assert("writeRunReport 落盘 runs/last.json", (readJson(path.join(proj, "runs", "last.json")) || {}).subcommand === "init")
+  const ghost = path.join(proj, "ghost", "nested")
+  writeRunReport(ghost, { subcommand: "x" })
+  assert("writeRunReport 根不存在静默跳过", !fs.existsSync(path.join(ghost, "runs")))
+  fs.rmSync(proj, { recursive: true, force: true })
+  // doctor 集成冒烟：五依赖已装为测试前提（与既有用例一致）；段错误类失败会在此被抓住
+  const health = cmdDoctor()
+  assert("doctor 六行（node + 五依赖）", health.rows.length === 6)
+  assert("doctor 全绿", health.allOk === true)
+}
+
 /** 运行一个会自行设置 exitCode 的命令函数，返回进程退出码 */
 async function runCmd(fn) {
   const prev = process.exitCode
