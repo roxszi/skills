@@ -5,12 +5,13 @@
 ## 维护契约
 
 - 本技能无 tests 目录，改动 SKILL.md 后跑 `scan_zh_punct.mjs`（标点降级扫描）＋关键锚点 grep（确认引用的章节条目存在）。
-- 改动同步两处：源码 `C:\CodeProjects\AI-Skills\skills\tech-brief-writer\` 与宿主副本 `workspace-chem\skills\tech-brief-writer\`，写回后 hash 比对一致才算完成。
+- AI-Skills 源码仓（`C:\CodeProjects\AI-Skills\skills\tech-brief-writer\`）的 Git 发布版本由用户自行维护，本 skill 改动不自动同步该仓库（2026-11-10 用户拍板，废止原「改动同步两处」契约）。
 - 修改 SKILL.md 或本文件后，在下方版本历史追加条目，只写改了什么。
 - 范式简报（LTRS／SERDS 目录）是 skill 自带教学资产，随 skill 一起分发（2026-10-20 用户拍板）。
 
 ## 版本历史
 
-- v4.4.1（2026-11-10）：MD 引用块吞行防范——① 新增 §三·3.6「MD 引用块吞行防范（硬换行规则）」，规则行（与全虾 AGENTS 逐字一致）：引用块（>）内多行行尾加两空格（硬换行）或行间空行（分段），否则渲染并为一行，交付前预览或脚本检查；② §5.1 自检清单新增全文级「MD 引用块吞行」项；③ 检查脚本入库 `scripts/check-md-quote-lines.mjs`（报 0 吞行 = 通过，修复用行尾两空格方案；空引用行 `>` 为分段不误报，列表项行不并排不误报）。实例：2026-11-10 两篇技术简报（colloid-reagents-stability / lspr-colloid-growth）踩中引用块软换行 silent bug，写入零报错、仅渲染可见，共 18 处并为一行，已行尾两空格修复升版 b。脚本首版曾把空引用行误判为内容行报假残留，入库版已修。
+- v4.4.1（2026-11-10）：MD 引用块吞行防范——① 新增 §三·3.6「MD 引用块吞行防范（硬换行规则）」，规则行（与全虾 AGENTS 逐字一致）：引用块（>）内多行行尾加两空格（硬换行）或行间空行（分段），否则渲染并为一行，交付前预览或脚本检查；② §5.1 自检清单新增全文级「MD 引用块吞行」项；③ 检查脚本入库 `scripts/check-md-quote-lines.mjs`（报 0 吞行 = 通过，修复用行尾两空格方案；空引用行 `>` 为分段不误报，列表项行不并排不误报）。实例：2026-11-10 两篇技术简报（colloid-reagents-stability / lspr-colloid-growth）踩中引用块软换行 silent bug，写入零报错、仅渲染可见，共 18 处并为一行，已行尾两空格修复升版 b。脚本首版曾把空引用行误判为内容行报假残留，入库版已修。维护契约同步修订：删「改动同步两处」要求，AI-Skills 仓由用户自行维护（2026-11-10 用户拍板；本次同步保留）。
+- v4.4.2（2026-11-10）：Mermaid 长文本节点 VSCode 截断防范——① §三·3.5 踩坑清单新增一行：本地预览（VSCode）长文本节点截断（Obsidian 正常），修复 = 图代码块顶部加 frontmatter `config.flowchart.wrappingWidth: 150`（2026-11-10 用户实测；官方配置项）；② 表后新增 frontmatter 硬边界段：需 mermaid v10.5+、拼错键名静默忽略格式错误炸图须目验、WebChat 通道不加 frontmatter（版本不可查）。实例：2026-11-10 用户在 VSCode 预览简报 mermaid 图发现截断，加 frontmatter 后解决。
 - v4.4.0（2026-10-20）：运行时注入面瘦身（A 档，用户拍板）——① Mermaid 渲染验证 SOP 的 HTML 模板外置 `references/mermaid-verify-template.html`；② Canvas 散点反模式删 mulberry32 完整代码块（template.html 已封装），保留症状-修复-验证方法与关键纪律；③ 反模式 A/B/D 压成症状-根因-修复链，删展开代码；④ §五自检清单全部条目压缩为「项名＋一句合格判定＋指针」，删除与 §一／§二／§三／§四 的重复表述；⑤ DOI 决策树 ASCII 压成文字降级链；⑥ 删 §三·3.3「文件命名示意」条（原第 6 条 viewBox 顺移为第 5 条）；⑦ scripts 首选 .html 理由 4 条压 1 段。SKILL.md 32363 → 28662 字符（省 11.4%）；规则条目与清单项数零删减。
 - v4.3.0 及更早：历史条目未另立档案，见各宿主副本历史记录。

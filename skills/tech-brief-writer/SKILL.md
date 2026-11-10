@@ -3,7 +3,7 @@ name: tech-brief-writer
 slug: 技术简报撰写
 description: 技术简报撰写。为某项技术/方法/仪器原理撰写"可存档技术简报"时使用。产出"MD 简报 + 可选交互式 HTML 演示"双件套。当用户说"写个技术简报""帮我把 XX 技术整理成备忘""看一下这篇文章用的技术并存档"等表述时触发。本 skill 定义了简报的目录规范、11 章节模板（含独立术语表与参考文献章节）、技术依赖处理规则、图/公式/算例要求、交互演示规格、诚实性红线与交付前自检清单。配套：`template.md`（MD 骨架）+ `template.html`（HTML 工程化骨架）双模板。
 author: RoxSzi (SI_Cheng-Yun, 司承运)
-version: 4.4.1
+version: 4.4.2
 license: MulanPSL v2
 ---
 
@@ -562,6 +562,9 @@ Mermaid 解析器对节点标签、边标签、箭头语法有严格的保留字
 | 节点 ID 与保留字冲突 | `subgraph` `end` `flowchart` 不能作为节点 ID | 用中文节点 ID（新版 mermaid 支持）或加前缀（`sub_` 等） |
 | 子图名带括号 / 引号 | `subgraph "name"` 在某些版本失败 | 用 `subgraph name["..."]` 显式 ID + 标签 |
 | **边标签内含 `(`, `[`, `]`, `{`, `}` 等保留字符** | mermaid 解析器把这些字符当成节点形状定义开始符（`(` = PS Parallelogram Start，`[` = SQE Square End 等），抛 `Expecting 'SQE'... got 'PS'` | 边标签必须用双引号 `\|"..."\|` 包围；或把括号改成全角 `（）【】`；或用 `·,` 代替 |
+| **VSCode 预览下长文本节点截断**（Obsidian 同图正常） | 本地预览插件 mermaid 版本不可控，节点长文本不自动换行 | 图代码块顶部加 YAML frontmatter：首行 `---`，随后 `config:` → `  flowchart:` → `    wrappingWidth: 150`，末行 `---` 收尾（官方配置项，控制节点文本自动换行宽度；2026-11-10 用户实测 150 有效） |
+
+**frontmatter 配置硬边界**（2026-11-10 新增）：上表 wrappingWidth 方案依赖 mermaid v10.5+ 的 frontmatter config 语法；官方文档明示拼错键名会静默忽略、格式错误会炸图，写后必须在目标预览器目验一次。
 
 #### Mermaid 渲染验证 SOP
 
